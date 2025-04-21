@@ -1,0 +1,23 @@
+# Node
+node_modules/
+dist/
+*.log
+.env
+coverage/
+
+# Prisma
+prisma/generated/
+
+# Python (cuando lo crees)
+__pycache__/
+*.pyc
+.env
+.venv/
+.env.local
+
+# VSCode
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

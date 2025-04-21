@@ -1,0 +1,25 @@
+# Node
+node_modules/
+dist/
+.env
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.sqlite3
+venv/
+.env
+.env.*
+
+# IDEs
+.vscode/
+.idea/
+.DS_Store
+
+# OS
+Thumbs.db
+
+# Prisma
+/prisma/migrations/

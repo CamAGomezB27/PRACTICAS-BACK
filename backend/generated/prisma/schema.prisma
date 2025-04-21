@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model archivo_adjunto {
+  id_archivo     Int       @id @default(autoincrement())
+  id_novedad     Int?
+  nombre_archivo String?   @db.VarChar(255)
+  ruta_archivo   String?
+  fecha_subida   DateTime? @default(now()) @db.Timestamp(6)
+  novedad        novedad?  @relation(fields: [id_novedad], references: [id_novedad], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model correo_log {
+  id_log          Int           @id @default(autoincrement())
+  id_notificacion Int?
+  estado_envio    String?       @db.VarChar(50)
+  fecha_envio     DateTime?     @default(now()) @db.Timestamp(6)
+  mensaje_error   String?
+  notificacion    notificacion? @relation(fields: [id_notificacion], references: [id_notificacion], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model estado_novedad {
+  id_estado_novedad Int                 @id @default(autoincrement())
+  nombre_estado     String              @db.VarChar(50)
+  historial_novedad historial_novedad[]
+  novedad           novedad[]
+}
+
+model historial_novedad {
+  id_historial            Int             @id @default(autoincrement())
+  id_novedad              Int?
+  id_estado_novedad       Int?
+  fecha_modificacion      DateTime?       @default(now()) @db.Timestamp(6)
+  comentario              String?
+  id_usuario_modificacion Int?
+  estado_novedad          estado_novedad? @relation(fields: [id_estado_novedad], references: [id_estado_novedad], onUpdate: NoAction)
+  novedad                 novedad?        @relation(fields: [id_novedad], references: [id_novedad], onDelete: Cascade, onUpdate: NoAction)
+  usuario                 usuario?        @relation(fields: [id_usuario_modificacion], references: [id_usuario], onUpdate: NoAction)
+}
+
+model notificacion {
+  id_notificacion Int          @id @default(autoincrement())
+  id_usuario      Int?
+  id_novedad      Int?
+  mensaje         String?
+  fecha_creacion  DateTime?    @default(now()) @db.Timestamp(6)
+  leido           Boolean?     @default(false)
+  correo_log      correo_log[]
+  novedad         novedad?     @relation(fields: [id_novedad], references: [id_novedad], onDelete: Cascade, onUpdate: NoAction)
+  usuario         usuario?     @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model novedad {
+  id_novedad        Int                 @id @default(autoincrement())
+  id_usuario        Int?
+  id_tipo_novedad   Int?
+  id_estado_novedad Int?
+  fecha_creacion    DateTime?           @default(now()) @db.Timestamp(6)
+  descripcion       String?
+  archivo_adjunto   archivo_adjunto[]
+  historial_novedad historial_novedad[]
+  notificacion      notificacion[]
+  estado_novedad    estado_novedad?     @relation(fields: [id_estado_novedad], references: [id_estado_novedad], onUpdate: NoAction)
+  tipo_novedad      tipo_novedad?       @relation(fields: [id_tipo_novedad], references: [id_tipo_novedad], onUpdate: NoAction)
+  usuario           usuario?            @relation(fields: [id_usuario], references: [id_usuario], onUpdate: NoAction)
+}
+
+model rol {
+  id_rol      Int           @id @default(autoincrement())
+  nombre_rol  String        @db.VarChar(50)
+  usuario_rol usuario_rol[]
+}
+
+model tipo_novedad {
+  id_tipo_novedad Int       @id @default(autoincrement())
+  nombre_tipo     String    @db.VarChar(100)
+  codigo          String    @unique @db.VarChar(50)
+  novedad         novedad[]
+}
+
+model usuario {
+  id_usuario        Int                 @id @default(autoincrement())
+  nombre            String              @db.VarChar(100)
+  correo            String              @unique @db.VarChar(100)
+  historial_novedad historial_novedad[]
+  notificacion      notificacion[]
+  novedad           novedad[]
+  usuario_rol       usuario_rol[]
+}
+
+model usuario_rol {
+  id_usuario Int
+  id_rol     Int
+  rol        rol     @relation(fields: [id_rol], references: [id_rol], onDelete: Cascade, onUpdate: NoAction)
+  usuario    usuario @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([id_usuario, id_rol])
+}
