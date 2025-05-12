@@ -1,17 +1,17 @@
+// src/auth/auth.module.ts
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt'; // Asegúrate de importar JwtModule
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule } from '@nestjs/config'; // 👈 ¡este es el salvador!
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { PrismaService } from '../../prisma/prisma.service'; // Importa correctamente PrismaService
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Module({
   imports: [
-    JwtModule.register({
-      secret: process.env.JWT_SECRET, // Cambia esto por una clave secreta segura
-      signOptions: { expiresIn: '1h' }, // El token expira en 1 hora
-    }),
+    JwtModule.register({}),
+    ConfigModule, // 👈 Agrégalo aquí
   ],
-  providers: [AuthService, PrismaService],
   controllers: [AuthController],
+  providers: [AuthService, PrismaService],
 })
 export class AuthModule {}

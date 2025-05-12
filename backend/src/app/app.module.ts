@@ -1,10 +1,12 @@
+// src/app.module.ts
 import { Module } from '@nestjs/common';
-import { AppController } from './controllers/app.controller';
-import { AppService } from './services/app.service';
+import { ConfigModule } from '@nestjs/config';
+import { AuthModule } from '../auth/auth.module'; // importa el módulo de auth
 
 @Module({
-  imports: [],
-  controllers: [AppController],
-  providers: [AppService],
+  imports: [
+    ConfigModule.forRoot(),
+    AuthModule, //  agrégalo aquí
+  ],
 })
 export class AppModule {}

@@ -2,6 +2,7 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import axios from 'axios';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ConfigService } from '@nestjs/config'; // Importar ConfigService
 import { Prisma } from '@prisma/client';
 
 interface GoogleUser {
@@ -26,6 +27,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService, // Inyectado aquí
   ) {}
 
   async validateGoogleToken(googleToken: string): Promise<GoogleUser> {
@@ -74,7 +76,11 @@ export class AuthService {
       id_usuario: user.id_usuario,
     };
 
-    const token = this.jwtService.sign(payload);
+    // Accedemos a JWT_SECRET dentro del método y firmamos el token
+    const jwtSecret = this.configService.get<string>('JWT_SECRET'); // Acceder a la variable de entorno
+    const token = this.jwtService.sign(payload, {
+      secret: jwtSecret, // Aquí estamos pasando el secreto del .env
+    });
 
     return { token };
   }
