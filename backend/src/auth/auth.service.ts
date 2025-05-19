@@ -44,7 +44,14 @@ export class AuthService {
     }
   }
 
-  async loginWithGoogle(googleToken: string): Promise<{ token: string }> {
+  async loginWithGoogle(googleToken: string): Promise<{
+    token: string;
+    user: {
+      correo: string;
+      id_usuario: number;
+      esAdmin: boolean;
+    };
+  }> {
     const googleUser = await this.validateGoogleToken(googleToken);
 
     const user: Usuario | null = await this.prisma.usuario.findUnique({
@@ -82,6 +89,13 @@ export class AuthService {
       secret: jwtSecret, // Aquí estamos pasando el secreto del .env
     });
 
-    return { token };
+    return {
+      token,
+      user: {
+        correo: user.correo,
+        id_usuario: user.id_usuario,
+        esAdmin: rolesPermitidos.includes(userRole.rol.nombre_rol),
+      },
+    };
   }
 }
