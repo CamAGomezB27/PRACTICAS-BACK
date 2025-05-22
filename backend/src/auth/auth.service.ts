@@ -47,6 +47,7 @@ export class AuthService {
   async loginWithGoogle(googleToken: string): Promise<{
     token: string;
     user: {
+      nombre: string;
       correo: string;
       id_usuario: number;
       esAdmin: boolean;
@@ -92,6 +93,7 @@ export class AuthService {
     return {
       token,
       user: {
+        nombre: googleUser.name,
         correo: user.correo,
         id_usuario: user.id_usuario,
         esAdmin: rolesPermitidos.includes(userRole.rol.nombre_rol),
