@@ -1,4 +1,7 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022"
+  },
   "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
 }

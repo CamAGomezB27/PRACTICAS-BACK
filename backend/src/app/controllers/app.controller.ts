@@ -4,6 +4,6 @@ import { Controller, Get } from '@nestjs/common';
 export class AppController {
   @Get()
   getHello(): string {
-    return '¡Hola desde el backend!';
+    return '¡Hola desde el backend!, aca vamos a gestionar las novedades postnomina para SODIMAC';
   }
 }
