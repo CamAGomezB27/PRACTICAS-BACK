@@ -2,7 +2,7 @@ import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import axios from 'axios';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ConfigService } from '@nestjs/config'; // Importar ConfigService
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 
 interface GoogleUser {
@@ -27,7 +27,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-    private readonly configService: ConfigService, // Inyectado aquí
+    private readonly configService: ConfigService,
   ) {}
 
   async validateGoogleToken(googleToken: string): Promise<GoogleUser> {
@@ -50,7 +50,10 @@ export class AuthService {
       nombre: string;
       correo: string;
       id_usuario: number;
+      rol: string | null;
       esAdmin: boolean;
+      esNomina: boolean;
+      esJefe: boolean;
     };
   }> {
     const googleUser = await this.validateGoogleToken(googleToken);
@@ -69,25 +72,26 @@ export class AuthService {
         include: { rol: true },
       });
 
-    const rolesPermitidos = ['Administrador']; // Agrega más si necesitas
-
-    if (
-      !userRole ||
-      !userRole.rol ||
-      !rolesPermitidos.includes(userRole.rol.nombre_rol)
-    ) {
-      throw new HttpException('Acceso denegado', HttpStatus.FORBIDDEN);
+    //Sin rol no se da ingreso
+    if (!userRole || !userRole.rol) {
+      throw new HttpException(
+        'No tiene permiso para ingresar',
+        HttpStatus.FORBIDDEN,
+      );
     }
+
+    //Nombre del rol si existe
+    const rolNombre = userRole.rol.nombre_rol;
 
     const payload: JwtPayload = {
       correo: user.correo,
       id_usuario: user.id_usuario,
     };
 
-    // Accedemos a JWT_SECRET dentro del método y firmamos el token
-    const jwtSecret = this.configService.get<string>('JWT_SECRET'); // Acceder a la variable de entorno
+    // Accedemos a JWT_SECRET
+    const jwtSecret = this.configService.get<string>('JWT_SECRET');
     const token = this.jwtService.sign(payload, {
-      secret: jwtSecret, // Aquí estamos pasando el secreto del .env
+      secret: jwtSecret,
     });
 
     return {
@@ -96,7 +100,10 @@ export class AuthService {
         nombre: googleUser.name,
         correo: user.correo,
         id_usuario: user.id_usuario,
-        esAdmin: rolesPermitidos.includes(userRole.rol.nombre_rol),
+        rol: rolNombre,
+        esAdmin: rolNombre === 'Administrador',
+        esNomina: rolNombre === 'Nomina',
+        esJefe: rolNombre === 'Jefe',
       },
     };
   }
