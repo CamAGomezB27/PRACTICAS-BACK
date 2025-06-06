@@ -6,6 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "script": "ts-node --transpile-only scripts",
     "start": "nest start",
     "doc": "npx compodoc -p tsconfig.json -s",
     "build": "nest build",
