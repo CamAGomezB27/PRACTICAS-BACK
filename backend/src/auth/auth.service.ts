@@ -81,7 +81,10 @@ export class AuthService {
     }
 
     //Nombre del rol si existe
-    const rolNombre = userRole.rol.nombre_rol;
+    const rolNombre = userRole.rol.nombre_rol
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ');
 
     const payload: JwtPayload = {
       correo: user.correo,
@@ -94,16 +97,19 @@ export class AuthService {
       secret: jwtSecret,
     });
 
+    console.log('🧩 Rol limpio:', rolNombre);
+    console.log('Nombre que devuelve backend:', user.nombre);
+
     return {
       token,
       user: {
-        nombre: googleUser.name,
+        nombre: user.nombre,
         correo: user.correo,
         id_usuario: user.id_usuario,
-        rol: rolNombre,
-        esAdmin: rolNombre === 'Administrador',
-        esNomina: rolNombre === 'Nomina',
-        esJefe: rolNombre === 'Jefe',
+        rol: userRole.rol.nombre_rol, // nombre original sin modificar
+        esAdmin: rolNombre === 'administrador',
+        esNomina: rolNombre === 'gestor de nomina',
+        esJefe: rolNombre === 'jefe de tienda',
       },
     };
   }
