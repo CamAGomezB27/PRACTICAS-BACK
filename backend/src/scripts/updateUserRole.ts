@@ -11,7 +11,7 @@ async function main() {
   });
 
   if (!usuario) {
-    console.error('🚫 Usuario no encontrado');
+    console.error(`🚫 No se encuentra el usuario`);
     return;
   }
 
