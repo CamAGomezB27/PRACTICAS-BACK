@@ -6,9 +6,10 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtStrategy } from './jwt.strategy';
+import { UsuarioModule } from 'src/usuario/usuario.module';
 
 @Module({
-  imports: [JwtModule.register({}), ConfigModule],
+  imports: [JwtModule.register({}), ConfigModule, UsuarioModule],
   controllers: [AuthController],
   providers: [AuthService, PrismaService, JwtStrategy],
 })

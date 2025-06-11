@@ -1,3 +1,4 @@
+// src/usuario/usuario.service.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 
@@ -10,5 +11,18 @@ export class UsuarioService {
       where: { correo: email },
     });
     return !!usuario;
+  }
+
+  async findById(id_usuario: number) {
+    return this.prisma.usuario.findUnique({
+      where: { id_usuario },
+      include: {
+        usuario_rol: {
+          include: {
+            rol: true,
+          },
+        },
+      },
+    });
   }
 }

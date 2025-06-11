@@ -9,7 +9,7 @@ async function bootstrap() {
   app.use(cookieParser()); // Cookies
 
   app.enableCors({
-    origin: 'http://localhost:5173', //url front
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'], //url front
     credentials: true, //permite cruze de cookies
   });
 

@@ -25,6 +25,7 @@ export class JwtStrategy extends PassportStrategy(JwtStrategyBase) {
   }
 
   validate(payload: JwtPayload): JwtPayload {
+    console.log('Playload JWT recibido:', payload);
     return payload;
   }
 }
