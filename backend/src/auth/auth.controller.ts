@@ -86,8 +86,14 @@ export class AuthController {
 
   //LogOut Elimina cookie
   @Post('logout')
+  @UseGuards(JwtAuthGuard)
   logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie('jwt');
-    return { message: 'Sesión cerrdad correctamente' };
+    res.clearCookie('jwt', {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false,
+      path: '/',
+    });
+    return { message: 'Sesión cerrada correctamente' };
   }
 }
