@@ -1,0 +1,60 @@
+import { Controller, Get, Query, Res, Req, UseGuards } from '@nestjs/common';
+import { Response } from 'express';
+import { ArchivoAdjuntoService } from '../services/archivo_adjunto.service';
+import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+
+//Request de usuario
+interface AuthenticatedRequest extends Request {
+  user: {
+    nombre: string;
+    correo: string;
+    id_usuario: number;
+    esAdmin: boolean;
+    esJefe: boolean;
+    esNomina: boolean;
+  };
+}
+
+@Controller('archivo-adjunto')
+export class ArchivoAdjuntoController {
+  constructor(private readonly archivoAdjuntoService: ArchivoAdjuntoService) {}
+
+  @UseGuards(JwtAuthGuard)
+  @Get('descargar-plantilla')
+  async descargarPlantilla(
+    @Req() req: AuthenticatedRequest,
+    @Res() res: Response,
+    @Query('titulo') titulo: string,
+  ) {
+    try {
+      const nombreUsuario = req.user?.nombre || 'Nombre no disponible';
+
+      const buffer = await this.archivoAdjuntoService.generarPlantillaExcel(
+        titulo,
+        nombreUsuario,
+      );
+
+      // Headers
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      res.setHeader(
+        'Content-Disposition',
+        'attachment; filename=plantilla_solicitud.xlsx',
+      );
+
+      res.send(buffer);
+    } catch (error) {
+      let errorMessage = 'Error desconocido';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      res.status(500).json({
+        message: 'No se pudo generar la plantilla',
+        error: errorMessage,
+      });
+    }
+  }
+}
