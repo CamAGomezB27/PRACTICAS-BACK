@@ -27,12 +27,17 @@ export class ArchivoAdjuntoController {
     @Query('titulo') titulo: string,
   ) {
     try {
+      console.log('REQ.USER:', req.user);
+      console.log('Llamando al servicio para generar plantilla...');
       const nombreUsuario = req.user?.nombre || 'Nombre no disponible';
 
       const buffer = await this.archivoAdjuntoService.generarPlantillaExcel(
         titulo,
         nombreUsuario,
       );
+
+      console.log('Título recibido:', titulo);
+      console.log('Usuario:', req.user);
 
       // Headers
       res.setHeader(
@@ -46,14 +51,10 @@ export class ArchivoAdjuntoController {
 
       res.send(buffer);
     } catch (error) {
-      let errorMessage = 'Error desconocido';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-
+      console.error('❌ Error al generar plantilla:', error);
       res.status(500).json({
         message: 'No se pudo generar la plantilla',
-        error: errorMessage,
+        error: error instanceof Error ? error.stack : String(error),
       });
     }
   }
