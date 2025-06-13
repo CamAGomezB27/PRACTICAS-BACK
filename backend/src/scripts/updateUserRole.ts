@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  const correo = 'camiloandresgomez05272002@gmail.com';
+  const correo = 'pruebascosas27@gmail.com';
   const nuevoRol = 3; //Nuevo rol
 
   const usuario = await prisma.usuario.findUnique({
