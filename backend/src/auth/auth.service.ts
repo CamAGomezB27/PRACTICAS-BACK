@@ -3,7 +3,6 @@ import { JwtService } from '@nestjs/jwt';
 import axios from 'axios';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
-import { Prisma } from '@prisma/client';
 
 interface GoogleUser {
   email: string;
@@ -11,16 +10,16 @@ interface GoogleUser {
   picture: string;
 }
 
+// JWT Payload expandido con todos los campos necesarios
 interface JwtPayload {
   correo: string;
   id_usuario: number;
+  nombre: string;
+  rol: string;
+  esAdmin: boolean;
+  esNomina: boolean;
+  esJefe: boolean;
 }
-
-// Tipos inferidos de Prisma
-type Usuario = Prisma.usuarioGetPayload<true>;
-type UsuarioRolConRol = Prisma.usuario_rolGetPayload<{
-  include: { rol: true };
-}>;
 
 @Injectable()
 export class AuthService {
@@ -58,7 +57,7 @@ export class AuthService {
   }> {
     const googleUser = await this.validateGoogleToken(googleToken);
 
-    const user: Usuario | null = await this.prisma.usuario.findUnique({
+    const user = await this.prisma.usuario.findUnique({
       where: { correo: googleUser.email },
     });
 
@@ -66,11 +65,10 @@ export class AuthService {
       throw new HttpException('Usuario no encontrado', HttpStatus.NOT_FOUND);
     }
 
-    const userRole: UsuarioRolConRol | null =
-      await this.prisma.usuario_rol.findFirst({
-        where: { id_usuario: user.id_usuario },
-        include: { rol: true },
-      });
+    const userRole = await this.prisma.usuario_rol.findFirst({
+      where: { id_usuario: user.id_usuario },
+      include: { rol: true },
+    });
 
     //Sin rol no se da ingreso
     if (!userRole || !userRole.rol) {
@@ -86,9 +84,19 @@ export class AuthService {
       .toLowerCase()
       .replace(/\s+/g, ' ');
 
+    const esAdmin = rolNombre === 'administrador';
+    const esNomina = rolNombre === 'gestor de nomina';
+    const esJefe = rolNombre === 'jefe de tienda';
+
+    // JWT Payload con TODOS los campos necesarios
     const payload: JwtPayload = {
       correo: user.correo,
       id_usuario: user.id_usuario,
+      nombre: user.nombre, // ← AGREGADO
+      rol: userRole.rol.nombre_rol, // ← AGREGADO
+      esAdmin, // ← AGREGADO
+      esNomina, // ← AGREGADO
+      esJefe, // ← AGREGADO
     };
 
     // Accedemos a JWT_SECRET
@@ -99,6 +107,7 @@ export class AuthService {
 
     console.log('🧩 Rol limpio:', rolNombre);
     console.log('Nombre que devuelve backend:', user.nombre);
+    console.log('Playload JWT que se genera:', payload); // ← Para verificar
 
     return {
       token,
@@ -107,9 +116,9 @@ export class AuthService {
         correo: user.correo,
         id_usuario: user.id_usuario,
         rol: userRole.rol.nombre_rol, // nombre original sin modificar
-        esAdmin: rolNombre === 'administrador',
-        esNomina: rolNombre === 'gestor de nomina',
-        esJefe: rolNombre === 'jefe de tienda',
+        esAdmin,
+        esNomina,
+        esJefe,
       },
     };
   }

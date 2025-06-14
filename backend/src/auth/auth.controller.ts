@@ -15,16 +15,20 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { UsuarioService } from 'src/usuario/services/usuario.service';
 
 // Tipo Request para 'user'
+// Actualiza esta interface en tu controlador
 interface AuthenticatedRequest extends Request {
   user: {
-    nombre: string;
     correo: string;
     id_usuario: number;
-    esAdmin: boolean;
-    esJefe: boolean;
-    esNomina: boolean;
+    nombre: string; // ← AGREGADO
+    rol: string; // ← AGREGADO
+    esAdmin: boolean; // ← AGREGADO
+    esJefe: boolean; // ← AGREGADO
+    esNomina: boolean; // ← AGREGADO
+    iat: number; // ← Token timestamp
   };
 }
+
 @Controller('auth')
 export class AuthController {
   constructor(
