@@ -92,6 +92,7 @@ model usuario {
   notificacion      notificacion[]
   novedad           novedad[]
   usuario_rol       usuario_rol[]
+  usuario_tienda    usuario_tienda[] 
 }
 
 model usuario_rol {
@@ -101,4 +102,19 @@ model usuario_rol {
   usuario    usuario @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([id_usuario, id_rol])
+}
+
+model tienda {
+  id_tienda      Int             @id @default(autoincrement())
+  nombre_tienda  String          @db.VarChar(100)
+  usuario_tienda usuario_tienda[]
+}
+
+model usuario_tienda {
+  id_usuario Int
+  id_tienda  Int
+  usuario    usuario @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+  tienda     tienda  @relation(fields: [id_tienda], references: [id_tienda], onDelete: Cascade)
+
+  @@id([id_usuario, id_tienda])
 }
