@@ -24,10 +24,17 @@ export class ArchivoAdjuntoController {
     @Req() req: AuthenticatedRequest,
     @Res() res: Response,
     @Query('titulo') titulo: string,
+    @Query('cantidad') cantidad: string,
   ) {
     try {
       console.log('REQ.USER:', req.user);
       console.log('Llamando al servicio para generar plantilla...');
+      const cantidadNum = parseInt(cantidad, 10);
+      if (isNaN(cantidadNum) || cantidadNum <= 0) {
+        return res
+          .status(400)
+          .json({ message: 'La cantidad debe ser un número positivo' });
+      }
       const nombreUsuario = req.user?.nombre || 'Nombre no disponible';
       const nombreTienda = req.user?.nombreTienda || 'Tienda no disponible';
 
@@ -35,6 +42,7 @@ export class ArchivoAdjuntoController {
         titulo,
         nombreUsuario,
         nombreTienda,
+        cantidadNum,
       );
 
       console.log('Título recibido:', titulo);

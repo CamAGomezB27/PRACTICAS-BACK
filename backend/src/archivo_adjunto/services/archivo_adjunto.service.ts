@@ -9,6 +9,7 @@ export class ArchivoAdjuntoService {
     titulo: string,
     nombreUsuario: string,
     nombreTienda: string,
+    cantidad: number,
   ): Promise<Buffer> {
     const basePath = __dirname.includes('dist')
       ? path.resolve(__dirname, '..', '..', '..', 'assets', 'templates')
@@ -37,27 +38,31 @@ export class ArchivoAdjuntoService {
     console.log('Título:', titulo);
     console.log('NombreUsuario:', nombreUsuario);
 
-    const row = worksheet.getRow(filaParaModificar);
+    for (let i = 0; i < cantidad; i++) {
+      const rowIndex = filaParaModificar + i;
+      const row = worksheet.getRow(rowIndex);
+
+      // Mapeo correcto según las cabeceras de tu plantilla:
+      // A = N, B = FECHA DE REPORTE, C = CEDULA, D = NOMBRE, E = CATEGORIA, F = TIENDA, G = QUIEN REPORTA, H = DETALLE NOVEDAD
+
+      row.getCell('A').value = null; // Limpia antes
+      row.getCell('A').value = i + 1; // N (columna A)
+
+      // FECHA DE REPORTE (columna B)
+      const fechaCell = row.getCell('B');
+      fechaCell.value = new Date();
+      fechaCell.numFmt = 'dd/mm/yyyy';
+
+      row.getCell('C').value = ''; // CEDULA (vacío por ahora)
+      row.getCell('D').value = ''; // NOMBRE (vacío por ahora)
+      row.getCell('E').value = titulo; // CATEGORIA (aquí va el título que recibes)
+      row.getCell('F').value = nombreTienda; // TIENDA DEL JEFE
+      row.getCell('G').value = nombreUsuario; // QUIEN REPORTA LA NOVEDAD
+      row.getCell('H').value = ''; // DETALLE NOVEDAD (vacío por ahora)
+
+      row.commit();
+    }
     console.log('🧾 Generando plantilla para tienda:', nombreTienda);
-
-    // Mapeo correcto según las cabeceras de tu plantilla:
-    // A = N, B = FECHA DE REPORTE, C = CEDULA, D = NOMBRE, E = CATEGORIA, F = TIENDA, G = QUIEN REPORTA, H = DETALLE NOVEDAD
-
-    row.getCell('A').value = 1; // N (columna A)
-
-    // FECHA DE REPORTE (columna B)
-    const fechaCell = row.getCell('B');
-    fechaCell.value = new Date();
-    fechaCell.numFmt = 'dd/mm/yyyy';
-
-    row.getCell('C').value = ''; // CEDULA (vacío por ahora)
-    row.getCell('D').value = ''; // NOMBRE (vacío por ahora)
-    row.getCell('E').value = titulo; // CATEGORIA (aquí va el título que recibes)
-    row.getCell('F').value = nombreTienda; // TIENDA DEL JEFE
-    row.getCell('G').value = nombreUsuario; // QUIEN REPORTA LA NOVEDAD
-    row.getCell('H').value = ''; // DETALLE NOVEDAD (vacío por ahora)
-
-    row.commit();
 
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
