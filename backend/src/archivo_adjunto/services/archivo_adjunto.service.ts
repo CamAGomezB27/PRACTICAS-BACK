@@ -8,6 +8,7 @@ export class ArchivoAdjuntoService {
   async generarPlantillaExcel(
     titulo: string,
     nombreUsuario: string,
+    nombreTienda: string,
   ): Promise<Buffer> {
     const basePath = __dirname.includes('dist')
       ? path.resolve(__dirname, '..', '..', '..', 'assets', 'templates')
@@ -37,6 +38,7 @@ export class ArchivoAdjuntoService {
     console.log('NombreUsuario:', nombreUsuario);
 
     const row = worksheet.getRow(filaParaModificar);
+    console.log('🧾 Generando plantilla para tienda:', nombreTienda);
 
     // Mapeo correcto según las cabeceras de tu plantilla:
     // A = N, B = FECHA DE REPORTE, C = CEDULA, D = NOMBRE, E = CATEGORIA, F = TIENDA, G = QUIEN REPORTA, H = DETALLE NOVEDAD
@@ -51,7 +53,7 @@ export class ArchivoAdjuntoService {
     row.getCell('C').value = ''; // CEDULA (vacío por ahora)
     row.getCell('D').value = ''; // NOMBRE (vacío por ahora)
     row.getCell('E').value = titulo; // CATEGORIA (aquí va el título que recibes)
-    row.getCell('F').value = ''; // TIENDA (vacío por ahora)
+    row.getCell('F').value = nombreTienda; // TIENDA DEL JEFE
     row.getCell('G').value = nombreUsuario; // QUIEN REPORTA LA NOVEDAD
     row.getCell('H').value = ''; // DETALLE NOVEDAD (vacío por ahora)
 

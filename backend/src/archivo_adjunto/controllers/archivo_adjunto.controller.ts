@@ -9,9 +9,8 @@ interface AuthenticatedRequest extends Request {
     nombre: string;
     correo: string;
     id_usuario: number;
-    esAdmin: boolean;
     esJefe: boolean;
-    esNomina: boolean;
+    nombreTienda: string;
   };
 }
 
@@ -30,10 +29,12 @@ export class ArchivoAdjuntoController {
       console.log('REQ.USER:', req.user);
       console.log('Llamando al servicio para generar plantilla...');
       const nombreUsuario = req.user?.nombre || 'Nombre no disponible';
+      const nombreTienda = req.user?.nombreTienda || 'Tienda no disponible';
 
       const buffer = await this.archivoAdjuntoService.generarPlantillaExcel(
         titulo,
         nombreUsuario,
+        nombreTienda,
       );
 
       console.log('Título recibido:', titulo);

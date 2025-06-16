@@ -7,6 +7,14 @@ import { Request } from 'express';
 interface JwtPayload {
   correo: string;
   id_usuario: number;
+  nombre: string;
+  rol: string;
+  esAdmin: boolean;
+  esNomina: boolean;
+  esJefe: boolean;
+  panelTitle: string;
+  userRoleTitle: string;
+  nombreTienda?: string;
 }
 
 @Injectable()
