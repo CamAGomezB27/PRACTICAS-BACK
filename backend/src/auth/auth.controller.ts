@@ -1,5 +1,3 @@
-// src/auth/auth.controller.ts
-
 import {
   Controller,
   Post,
@@ -9,23 +7,25 @@ import {
   UseGuards,
   Req,
 } from '@nestjs/common';
-import { AuthService } from './auth.service'; // Importa el AuthService
+import { AuthService } from './auth.service';
 import { Response } from 'express';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { UsuarioService } from 'src/usuario/services/usuario.service';
+import { PrismaService } from 'prisma/prisma.service';
 
-// Tipo Request para 'user'
-// Actualiza esta interface en tu controlador
 interface AuthenticatedRequest extends Request {
   user: {
     correo: string;
     id_usuario: number;
-    nombre: string; // ← AGREGADO
-    rol: string; // ← AGREGADO
-    esAdmin: boolean; // ← AGREGADO
-    esJefe: boolean; // ← AGREGADO
-    esNomina: boolean; // ← AGREGADO
-    iat: number; // ← Token timestamp
+    nombre: string;
+    rol: string;
+    esAdmin: boolean;
+    esJefe: boolean;
+    esNomina: boolean;
+    panelTitle: string;
+    userRoleTitle: string;
+    nombreTienda?: string;
+    iat: number;
   };
 }
 
@@ -34,9 +34,10 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly usuarioService: UsuarioService,
+    private readonly prisma: PrismaService,
   ) {}
 
-  //login con Google
+  // Login con Google
   @Post('google')
   async loginWithGoogle(
     @Body('token') googleToken: string,
@@ -46,8 +47,8 @@ export class AuthController {
 
     response.cookie('jwt', token, {
       httpOnly: true,
-      secure: false, //localhost
-      maxAge: 1000 * 60 * 60 * 24, //Tiempo token
+      secure: false, // localhost
+      maxAge: 1000 * 60 * 60 * 24,
       sameSite: 'lax',
       path: '/',
     });
@@ -58,37 +59,27 @@ export class AuthController {
     };
   }
 
-  //Obtener perfil del usuario
+  // Obtener perfil del usuario desde el AuthService
   @UseGuards(JwtAuthGuard)
   @Get('profile')
   async getProfile(@Req() req: AuthenticatedRequest) {
     const { id_usuario } = req.user;
 
-    const usuarioDB = await this.usuarioService.findById(id_usuario);
+    const user = await this.authService.getProfile(id_usuario);
 
-    if (!usuarioDB) {
+    if (!user) {
       return {
         message: 'Usuario no encontrado',
       };
     }
 
-    const rol = usuarioDB?.usuario_rol[0]?.rol.nombre_rol;
-
     return {
       message: 'Perfil cargado correctamente',
-      user: {
-        nombre: usuarioDB?.nombre,
-        correo: usuarioDB?.correo,
-        id_usuario: usuarioDB?.id_usuario,
-        rol,
-        esAdmin: rol === 'Administrador',
-        esNomina: rol === 'Nómina',
-        esJefe: rol === 'Jefe',
-      },
+      user,
     };
   }
 
-  //LogOut Elimina cookie
+  // Logout
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   logout(@Res({ passthrough: true }) res: Response) {

@@ -10,7 +10,6 @@ interface GoogleUser {
   picture: string;
 }
 
-// JWT Payload expandido con todos los campos necesarios
 interface JwtPayload {
   correo: string;
   id_usuario: number;
@@ -19,6 +18,9 @@ interface JwtPayload {
   esAdmin: boolean;
   esNomina: boolean;
   esJefe: boolean;
+  panelTitle: string;
+  userRoleTitle: string;
+  nombreTienda?: string;
 }
 
 @Injectable()
@@ -28,6 +30,35 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
+
+  private getPanelTitles(rol: string, nombreTienda?: string) {
+    const rolLimpio = rol.trim().toLowerCase().replace(/\s+/g, ' ');
+
+    switch (rolLimpio) {
+      case 'administrador':
+        return {
+          panelTitle: 'Panel Adminsitración',
+          userRoleTitle: 'Administrador',
+        };
+      case 'gestor de nomina':
+        return {
+          panelTitle: 'Panel de Nómina',
+          userRoleTitle: 'Gestor de Nómina',
+        };
+      case 'jefe de tienda':
+        return {
+          panelTitle: nombreTienda ? `Panel de ${nombreTienda}` : 'Panel Jefe',
+          userRoleTitle: nombreTienda
+            ? `Jefe de ${nombreTienda}`
+            : 'Jefe de Tienda',
+        };
+      default:
+        return {
+          panelTitle: 'No disponible',
+          userRoleTitle: 'No disponible',
+        };
+    }
+  }
 
   async validateGoogleToken(googleToken: string): Promise<GoogleUser> {
     const url = `https://oauth2.googleapis.com/tokeninfo?id_token=${googleToken}`;
@@ -43,20 +74,8 @@ export class AuthService {
     }
   }
 
-  async loginWithGoogle(googleToken: string): Promise<{
-    token: string;
-    user: {
-      nombre: string;
-      correo: string;
-      id_usuario: number;
-      rol: string | null;
-      esAdmin: boolean;
-      esNomina: boolean;
-      esJefe: boolean;
-    };
-  }> {
+  async loginWithGoogle(googleToken: string) {
     const googleUser = await this.validateGoogleToken(googleToken);
-
     const user = await this.prisma.usuario.findUnique({
       where: { correo: googleUser.email },
     });
@@ -70,7 +89,6 @@ export class AuthService {
       include: { rol: true },
     });
 
-    //Sin rol no se da ingreso
     if (!userRole || !userRole.rol) {
       throw new HttpException(
         'No tiene permiso para ingresar',
@@ -78,7 +96,6 @@ export class AuthService {
       );
     }
 
-    //Nombre del rol si existe
     const rolNombre = userRole.rol.nombre_rol
       .trim()
       .toLowerCase()
@@ -88,26 +105,47 @@ export class AuthService {
     const esNomina = rolNombre === 'gestor de nomina';
     const esJefe = rolNombre === 'jefe de tienda';
 
-    // JWT Payload con TODOS los campos necesarios
+    let nombreTienda: string | undefined = undefined;
+    if (esJefe) {
+      const TiendaJefe = await this.prisma.usuario.findUnique({
+        where: { id_usuario: user.id_usuario },
+        include: {
+          usuario_tienda: {
+            include: {
+              tienda: true,
+            },
+          },
+        },
+      });
+      nombreTienda = TiendaJefe?.usuario_tienda[0]?.tienda?.nombre_tienda;
+    }
+
+    const { panelTitle, userRoleTitle } = this.getPanelTitles(
+      userRole.rol.nombre_rol,
+      nombreTienda,
+    );
+
     const payload: JwtPayload = {
       correo: user.correo,
       id_usuario: user.id_usuario,
-      nombre: user.nombre, // ← AGREGADO
-      rol: userRole.rol.nombre_rol, // ← AGREGADO
-      esAdmin, // ← AGREGADO
-      esNomina, // ← AGREGADO
-      esJefe, // ← AGREGADO
+      nombre: user.nombre,
+      rol: userRole.rol.nombre_rol,
+      esAdmin,
+      esNomina,
+      esJefe,
+      panelTitle,
+      userRoleTitle,
+      nombreTienda,
     };
 
-    // Accedemos a JWT_SECRET
     const jwtSecret = this.configService.get<string>('JWT_SECRET');
-    const token = this.jwtService.sign(payload, {
-      secret: jwtSecret,
-    });
+    const token = this.jwtService.sign(payload, { secret: jwtSecret });
 
-    console.log('🧩 Rol limpio:', rolNombre);
-    console.log('Nombre que devuelve backend:', user.nombre);
-    console.log('Playload JWT que se genera:', payload); // ← Para verificar
+    console.log('🧩 Rol limpio: ', rolNombre);
+    console.log('Nombre que devuelve backend: ', user.nombre);
+    console.log('Tienda Asignada: ', nombreTienda);
+    console.log('Titulo Generado: ', panelTitle);
+    console.log('Playload JWT que se genera: ', payload);
 
     return {
       token,
@@ -115,11 +153,60 @@ export class AuthService {
         nombre: user.nombre,
         correo: user.correo,
         id_usuario: user.id_usuario,
-        rol: userRole.rol.nombre_rol, // nombre original sin modificar
+        rol: userRole.rol.nombre_rol,
         esAdmin,
         esNomina,
         esJefe,
+        panelTitle,
+        userRoleTitle,
+        nombreTienda,
       },
+    };
+  }
+
+  async getProfile(id_usuario: number) {
+    const user = await this.prisma.usuario.findUnique({
+      where: { id_usuario },
+      include: {
+        usuario_rol: {
+          include: { rol: true },
+        },
+        usuario_tienda: {
+          include: { tienda: true },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new HttpException('Usuario no encontrado', HttpStatus.NOT_FOUND);
+    }
+
+    const rol = user.usuario_rol[0]?.rol?.nombre_rol ?? '';
+    const rolLimpio = rol.trim().toLowerCase().replace(/\s+/g, ' ');
+    const esJefe = rolLimpio === 'jefe de tienda';
+    const esAdmin = rolLimpio === 'administrador';
+    const esNomina = rolLimpio === 'gestor de nomina';
+
+    const nombreTienda = esJefe
+      ? user.usuario_tienda?.[0]?.tienda?.nombre_tienda
+      : undefined;
+
+    const { panelTitle, userRoleTitle } = this.getPanelTitles(
+      rol,
+      nombreTienda,
+    );
+
+    return {
+      nombre: user.nombre,
+      correo: user.correo,
+      id_usuario: user.id_usuario,
+      rol,
+      esAdmin,
+      esNomina,
+      esJefe,
+      panelTitle,
+      userRoleTitle,
+      nombreTienda,
     };
   }
 }
