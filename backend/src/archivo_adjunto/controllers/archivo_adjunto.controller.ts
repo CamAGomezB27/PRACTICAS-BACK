@@ -1,7 +1,21 @@
-import { Controller, Get, Query, Res, Req, UseGuards } from '@nestjs/common';
-import { Response } from 'express';
+import {
+  Controller,
+  Get,
+  Query,
+  Res,
+  Req,
+  UseGuards,
+  UploadedFile,
+  UseInterceptors,
+  Post,
+} from '@nestjs/common';
+import { Response, Request } from 'express';
 import { ArchivoAdjuntoService } from '../services/archivo_adjunto.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import { Express } from 'express';
 
 //Request de usuario
 interface AuthenticatedRequest extends Request {
@@ -27,8 +41,6 @@ export class ArchivoAdjuntoController {
     @Query('cantidad') cantidad: string,
   ) {
     try {
-      console.log('REQ.USER:', req.user);
-      console.log('Llamando al servicio para generar plantilla...');
       const cantidadNum = parseInt(cantidad, 10);
       if (isNaN(cantidadNum) || cantidadNum <= 0) {
         return res
@@ -45,11 +57,6 @@ export class ArchivoAdjuntoController {
         cantidadNum,
       );
 
-      console.log('Título recibido:', titulo);
-      console.log('Usuario:', req.user);
-      console.log('🎯 Título recibido en el backend:', titulo);
-
-      // Headers
       res.setHeader(
         'Content-Type',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -61,11 +68,56 @@ export class ArchivoAdjuntoController {
 
       res.send(buffer);
     } catch (error) {
-      console.error('❌ Error al generar plantilla:', error);
       res.status(500).json({
         message: 'No se pudo generar la plantilla',
         error: error instanceof Error ? error.stack : String(error),
       });
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('subir-archivo')
+  @UseInterceptors(
+    FileInterceptor('archivo', {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, cb) => {
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const ext = extname(file.originalname);
+          cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        if (file.originalname.match(/\.(xlsx)$/)) {
+          cb(null, true);
+        } else {
+          cb(new Error('Solo se permiten archivos .xlsx'), false);
+        }
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+      },
+    }),
+  )
+  subirArchivo(
+    @UploadedFile() archivo: Express.Multer.File,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    try {
+      console.log('📄 Archivo recibido:', archivo);
+      return {
+        message: 'Archivo subido correctamente',
+        nombreArchivo: archivo.filename,
+        ruta: archivo.path,
+        usuario: req.user.nombre,
+      };
+    } catch (error) {
+      console.error('❌ Error al subir archivo:', error);
+      return {
+        message: 'No se pudo subir el archivo',
+        error: error instanceof Error ? error.stack : String(error),
+      };
     }
   }
 }
