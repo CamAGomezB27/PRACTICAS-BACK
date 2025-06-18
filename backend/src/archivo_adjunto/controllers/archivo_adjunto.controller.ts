@@ -47,6 +47,7 @@ export class ArchivoAdjuntoController {
 
       console.log('Título recibido:', titulo);
       console.log('Usuario:', req.user);
+      console.log('🎯 Título recibido en el backend:', titulo);
 
       // Headers
       res.setHeader(

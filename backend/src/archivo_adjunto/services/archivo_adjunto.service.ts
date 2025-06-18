@@ -44,8 +44,9 @@ export class ArchivoAdjuntoService {
       );
     }
 
+    const fileBuffer = fs.readFileSync(plantillaPath);
     const workbook = new Workbook();
-    await workbook.xlsx.readFile(plantillaPath);
+    await workbook.xlsx.load(fileBuffer);
     const worksheet = workbook.getWorksheet(1); // Primera hoja
 
     if (!worksheet) {
