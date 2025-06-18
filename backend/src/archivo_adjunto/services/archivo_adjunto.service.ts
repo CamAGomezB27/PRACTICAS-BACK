@@ -5,16 +5,36 @@ import * as fs from 'fs';
 
 @Injectable()
 export class ArchivoAdjuntoService {
+  private obtenerArchivoPorSolicitud(titulo: string): string {
+    if (
+      titulo === 'Auxilio de transporte' ||
+      titulo === 'Otros' ||
+      titulo === 'Otro Si Definitivo'
+    ) {
+      return 'SOLICITUDES.xlsx';
+    } else if (titulo === 'Horas Extra') {
+      return 'SOLICITUDES2.xlsx';
+    } else if (titulo === 'Otro Si Temporal') {
+      return 'SOLICITUDES3.xlsx';
+    } else if (titulo === 'Vacaciones') {
+      return 'SOLICITUDES4.xlsx';
+    } else {
+      throw new Error(`No se encontró una plantilla para el título: ${titulo}`);
+    }
+  }
   async generarPlantillaExcel(
     titulo: string,
     nombreUsuario: string,
     nombreTienda: string,
     cantidad: number,
   ): Promise<Buffer> {
+    const archivoSolicitud = this.obtenerArchivoPorSolicitud(titulo);
+
     const basePath = __dirname.includes('dist')
       ? path.resolve(__dirname, '..', '..', '..', 'assets', 'templates')
       : path.resolve(__dirname, '..', '..', 'assets', 'templates');
-    const plantillaPath = path.join(basePath, 'SOLICITUDES.xlsx');
+
+    const plantillaPath = path.join(basePath, archivoSolicitud);
 
     console.log('Buscando plantilla en:', plantillaPath);
 
