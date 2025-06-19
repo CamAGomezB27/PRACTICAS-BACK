@@ -1,5 +1,0 @@
-{
-  "dependencies": {
-    "@nestjs/platform-express": "^11.1.3"
-  }
-}
