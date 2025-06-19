@@ -12,6 +12,7 @@ import {
 import { Response, Request } from 'express';
 import { ArchivoAdjuntoService } from '../services/archivo_adjunto.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { NovedadeService } from 'src/novedad/services/novedad.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
@@ -30,7 +31,10 @@ interface AuthenticatedRequest extends Request {
 
 @Controller('archivo-adjunto')
 export class ArchivoAdjuntoController {
-  constructor(private readonly archivoAdjuntoService: ArchivoAdjuntoService) {}
+  constructor(
+    private readonly archivoAdjuntoService: ArchivoAdjuntoService,
+    private readonly novedadService: NovedadeService,
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @Get('descargar-plantilla')
@@ -100,17 +104,26 @@ export class ArchivoAdjuntoController {
       },
     }),
   )
-  subirArchivo(
+  async subirArchivo(
     @UploadedFile() archivo: Express.Multer.File,
     @Req() req: AuthenticatedRequest,
   ) {
     try {
       console.log('📄 Archivo recibido:', archivo);
+
+      //Registrar Novedad
+      const novedad = await this.novedadService.crearNovedad({
+        idUsuario: req.user.id_usuario,
+        descripcion: `Archivo "${archivo.originalname}" subido exitosamente`,
+        idEstado: 1, //ID de estado CREADA lo vamos a cambiar
+      });
+
       return {
         message: 'Archivo subido correctamente',
         nombreArchivo: archivo.filename,
         ruta: archivo.path,
         usuario: req.user.nombre,
+        novedadId: novedad.id_novedad,
       };
     } catch (error) {
       console.error('❌ Error al subir archivo:', error);
