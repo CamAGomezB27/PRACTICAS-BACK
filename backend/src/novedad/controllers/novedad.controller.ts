@@ -9,4 +9,17 @@ export class NovedadController {
   getAll() {
     return this.novedadService.obtenerNovedades();
   }
+
+  @Post()
+  create(
+    @Body()
+    body: {
+      idUsuario: number;
+      descripcion: string;
+      idEstado: number;
+      idTipoNovedad?: number;
+    },
+  ) {
+    return this.novedadService.crearNovedad(body);
+  }
 }
