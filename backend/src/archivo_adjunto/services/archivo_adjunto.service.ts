@@ -209,7 +209,6 @@ export class ArchivoAdjuntoService {
       }
 
       // Guardar en la base de datos
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await this.prisma.detalleNovedadMasiva.createMany({
         data: filas,
         skipDuplicates: true, // Evitar duplicados

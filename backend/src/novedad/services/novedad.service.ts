@@ -13,7 +13,7 @@ export class NovedadeService {
   }) {
     const { idUsuario, descripcion, idEstado, idTipoNovedad } = params;
 
-    const novedad = await this.prisma.novedad.create({
+    return this.prisma.novedad.create({
       data: {
         id_usuario: idUsuario,
         descripcion,
@@ -21,17 +21,48 @@ export class NovedadeService {
         id_tipo_novedad: idTipoNovedad,
       },
     });
-    return novedad;
   }
 
-  async obtenerNovedades() {
-    return this.prisma.novedad.findMany({
-      include: {
-        estado_novedad: true,
+  async obtenerNovedadesUsuarios(idUsuario: number, esJefe: boolean) {
+    const includeConfig = {
+      estado_novedad: true,
+      tipo_novedad: true,
+      usuario: {
+        include: {
+          usuario_tienda: {
+            include: {
+              tienda: true,
+            },
+          },
+        },
       },
-      orderBy: {
-        fecha_creacion: 'desc',
-      },
-    });
+    };
+
+    const orderConfig = {
+      fecha_creacion: 'desc' as const,
+    };
+
+    const baseQuery = {
+      include: includeConfig,
+      orderBy: orderConfig,
+    };
+
+    if (esJefe) {
+      return this.prisma.novedad.findMany({
+        ...baseQuery,
+        where: {
+          usuario: {
+            usuario_tienda: {
+              some: {
+                id_usuario: idUsuario,
+              },
+            },
+          },
+        },
+      });
+    }
+
+    // Para nómina
+    return this.prisma.novedad.findMany(baseQuery);
   }
 }
