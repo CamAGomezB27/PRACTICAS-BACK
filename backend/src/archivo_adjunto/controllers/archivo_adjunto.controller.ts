@@ -8,6 +8,7 @@ import {
   UploadedFile,
   UseInterceptors,
   Post,
+  Body,
 } from '@nestjs/common';
 import { Response, Request } from 'express';
 import { ArchivoAdjuntoService } from '../services/archivo_adjunto.service';
@@ -27,6 +28,10 @@ interface AuthenticatedRequest extends Request {
     esJefe: boolean;
     nombreTienda: string;
   };
+}
+
+interface ArchivoSubido {
+  titulo: string;
 }
 
 @Controller('archivo-adjunto')
@@ -107,15 +112,28 @@ export class ArchivoAdjuntoController {
   async subirArchivo(
     @UploadedFile() archivo: Express.Multer.File,
     @Req() req: AuthenticatedRequest,
+    @Body() body: ArchivoSubido,
   ) {
     try {
       console.log('📄 Archivo recibido:', archivo);
+      const titulo = body.titulo;
+      const mapaTiposNovedad: Record<string, number> = {
+        'Auxilio de transporte': 1,
+        'Horas Extra': 2,
+        Vacaciones: 3,
+        'Otro Si Temporal': 4,
+        'Otro Si Definitivo': 5,
+        Descuento: 6,
+        Otros: 7,
+      };
 
+      const idTipoNovedad = mapaTiposNovedad[titulo] ?? null;
       //Registrar Novedad
       const novedad = await this.novedadService.crearNovedad({
         idUsuario: req.user.id_usuario,
         descripcion: `Archivo "${archivo.originalname}" subido exitosamente`,
-        idEstado: 1, //ID de estado CREADA lo vamos a cambiar
+        idEstado: 1, //ID de estado CREADA
+        idTipoNovedad,
       });
 
       return {
