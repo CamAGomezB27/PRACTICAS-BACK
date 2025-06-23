@@ -66,6 +66,10 @@ model novedad {
   archivo_adjunto   archivo_adjunto[]
   historial_novedad historial_novedad[]
   notificacion      notificacion[]
+   // NUEVOS CAMPOS
+  es_masiva           Boolean  @default(false)
+  cantidad_solicitudes Int?     // solo si es masiva
+  
   estado_novedad    estado_novedad?     @relation(fields: [id_estado_novedad], references: [id_estado_novedad], onUpdate: NoAction)
   tipo_novedad      tipo_novedad?       @relation(fields: [id_tipo_novedad], references: [id_tipo_novedad], onUpdate: NoAction)
   usuario           usuario?            @relation(fields: [id_usuario], references: [id_usuario], onUpdate: NoAction)

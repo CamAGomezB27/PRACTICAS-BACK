@@ -8,9 +8,16 @@ import axios from 'axios';
 import { PrismaService } from 'prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
+interface RespuestaExitosa {
+  esMasiva: boolean;
+  cantidadSolicitudes: number;
+}
+
+type RespuestaMicroservicio = string[] | RespuestaExitosa;
 interface ResultadoValidacion {
   valido: boolean;
   errores?: string[];
+  cantidadSolicitudes?: number;
 }
 
 @Injectable()
@@ -136,22 +143,35 @@ export class ArchivoAdjuntoService {
     rutaArchivo: string,
   ): Promise<ResultadoValidacion> {
     try {
-      // Verificar que el archivo existe
       await fs.access(rutaArchivo);
 
       const form = new FormData();
       form.append('file', fsSync.createReadStream(rutaArchivo));
 
-      const response = await axios.post<ResultadoValidacion>(
+      const response = await axios.post<RespuestaMicroservicio>(
         'http://localhost:8001/validar/',
         form,
         {
           headers: form.getHeaders(),
-          timeout: 30000, // 30 segundos timeout
+          timeout: 30000,
         },
       );
 
-      return response.data;
+      const data = response.data;
+
+      // son errores
+      if (Array.isArray(data)) {
+        return {
+          valido: false,
+          errores: data,
+        };
+      }
+
+      //  todo está bien y nos devuelve la info masiva
+      return {
+        valido: true,
+        cantidadSolicitudes: data.cantidadSolicitudes,
+      };
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;

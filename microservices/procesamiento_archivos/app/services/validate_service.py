@@ -4,6 +4,7 @@ from io import BytesIO
 
 async def validar_excel(file: UploadFile):
     errores = []
+    cantidad_solicitudes = 0  # ✅ Contador de filas válidas
 
     content = await file.read()
     wb = openpyxl.load_workbook(filename=BytesIO(content), data_only=True)
@@ -33,7 +34,10 @@ async def validar_excel(file: UploadFile):
 
     if errores:
         print("❌ Errores de encabezado:", errores)
-        return errores
+        return {
+            "valido": False,
+            "errores": errores
+        }
 
     for row_idx in range(6, sheet.max_row + 1):
         fila = sheet[row_idx]
@@ -44,9 +48,24 @@ async def validar_excel(file: UploadFile):
 
         print(f"Validando fila {row_idx}...")
 
+        fila_valida = True
         for campo, col_idx in campos_obligatorios.items():
             cell = fila[col_idx]
             if cell.value is None or str(cell.value).strip() == "":
                 errores.append(f"Fila {row_idx}: El campo obligatorio '{campo}' está vacío.")
+                fila_valida = False
 
-    return errores
+        if fila_valida:
+            cantidad_solicitudes += 1
+
+    if errores:
+        return {
+            "valido": False,
+            "errores": errores
+        }
+
+    return {
+        "valido": True,
+        "esMasiva": True,
+        "cantidadSolicitudes": cantidad_solicitudes
+    }

@@ -8,11 +8,16 @@ router = APIRouter(
 
 @router.post("/")
 async def validar_archivo(file: UploadFile = File(...)):
+    # 🛡️ Validar extensión
     if not file.filename.endswith(".xlsx"):
         raise HTTPException(status_code=400, detail="Solo se permiten archivos .xlsx")
     
-    errores = await validar_excel(file)
-    
-    if errores:
-        return{"valido": False, "errores": errores}
-    return{"valido": True, "mensaje": "Archivo valido"} 
+    # 🔍 Llama a la función de validación
+    resultado = await validar_excel(file)
+
+    # 🔥 Si hay errores (es una lista), retornamos inválido
+    if isinstance(resultado, list):
+        return {"valido": False, "errores": resultado}
+
+    # ✅ Si es válido (es un dict), lo retornamos completo (ya contiene todo)
+    return resultado

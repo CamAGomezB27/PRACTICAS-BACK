@@ -15,12 +15,10 @@ import { ArchivoAdjuntoService } from '../services/archivo_adjunto.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { NovedadeService } from 'src/novedad/services/novedad.service';
 import { FileInterceptor } from '@nestjs/platform-express';
-// import { diskStorage } from 'multer';
-// import { extname } from 'path';
 import { memoryStorage } from 'multer';
 import { Express } from 'express';
 
-//Request de usuario
+// Request extendido con user
 interface AuthenticatedRequest extends Request {
   user: {
     nombre: string;
@@ -31,13 +29,16 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+// Body del archivo subido
 interface ArchivoSubido {
   titulo: string;
 }
 
+// Resultado de validación
 interface ResultadoValidacion {
   valido: boolean;
   errores?: string[];
+  cantidadSolicitudes?: number;
 }
 
 @Controller('archivo-adjunto')
@@ -62,6 +63,7 @@ export class ArchivoAdjuntoController {
           .status(400)
           .json({ message: 'La cantidad debe ser un número positivo' });
       }
+
       const nombreUsuario = req.user?.nombre || 'Nombre no disponible';
       const nombreTienda = req.user?.nombreTienda || 'Tienda no disponible';
 
@@ -122,6 +124,8 @@ export class ArchivoAdjuntoController {
           archivo.buffer,
         );
 
+      console.log('🧪 Resultado de validación:', validacion);
+
       if (!validacion.valido) {
         return {
           message: '❌ El archivo contiene errores',
@@ -129,7 +133,10 @@ export class ArchivoAdjuntoController {
         };
       }
 
-      // ✅ CREACIÓN DE NOVEDAD
+      // Capturar la cantidad de solicitudes detectadas
+      const cantidad = validacion.cantidadSolicitudes ?? 0;
+
+      // CREACIÓN DE NOVEDAD
       const mapaTiposNovedad: Record<string, number> = {
         'Auxilio de transporte': 1,
         'Horas Extra': 2,
@@ -142,11 +149,16 @@ export class ArchivoAdjuntoController {
 
       const idTipoNovedad = mapaTiposNovedad[titulo] ?? null;
 
+      console.log('🧪 Resultado de validación:', validacion);
+      console.log('Cantidad detectada:', validacion.cantidadSolicitudes);
+
       const novedad = await this.novedadService.crearNovedad({
         idUsuario: req.user.id_usuario,
         descripcion: `Archivo "${archivo.originalname}" subido exitosamente`,
         idEstado: 1, // Estado: CREADA
         idTipoNovedad,
+        esMasiva: true,
+        cantidadSolicitudes: cantidad,
       });
 
       // PROCESAR Y GUARDAR
@@ -159,6 +171,7 @@ export class ArchivoAdjuntoController {
         message: '✅ Archivo subido y procesado correctamente',
         usuario: req.user.nombre,
         novedadId: novedad.id_novedad,
+        cantidadProcesada: cantidad,
       };
     } catch (error) {
       console.error('❌ Error al subir y procesar archivo:', error);

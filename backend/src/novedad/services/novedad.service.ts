@@ -10,8 +10,17 @@ export class NovedadeService {
     descripcion: string;
     idEstado: number;
     idTipoNovedad?: number;
+    esMasiva?: boolean;
+    cantidadSolicitudes?: number;
   }) {
-    const { idUsuario, descripcion, idEstado, idTipoNovedad } = params;
+    const {
+      idUsuario,
+      descripcion,
+      idEstado,
+      idTipoNovedad,
+      esMasiva = false,
+      cantidadSolicitudes = null,
+    } = params;
 
     return this.prisma.novedad.create({
       data: {
@@ -19,37 +28,52 @@ export class NovedadeService {
         descripcion,
         id_estado_novedad: idEstado,
         id_tipo_novedad: idTipoNovedad,
+        es_masiva: esMasiva,
+        cantidad_solicitudes: cantidadSolicitudes,
       },
     });
   }
 
   async obtenerNovedadesUsuarios(idUsuario: number, esJefe: boolean) {
-    const includeConfig = {
-      estado_novedad: true,
-      tipo_novedad: true,
+    const selectConfig = {
+      id_novedad: true,
+      descripcion: true,
+      fecha_creacion: true,
+      es_masiva: true,
+      cantidad_solicitudes: true,
+      estado_novedad: {
+        select: {
+          nombre_estado: true,
+        },
+      },
+      tipo_novedad: {
+        select: {
+          nombre_tipo: true,
+        },
+      },
       usuario: {
-        include: {
+        select: {
           usuario_tienda: {
-            include: {
-              tienda: true,
+            select: {
+              tienda: {
+                select: {
+                  nombre_tienda: true,
+                },
+              },
             },
           },
         },
       },
     };
 
-    const orderConfig = {
+    const orderByConfig = {
       fecha_creacion: 'desc' as const,
-    };
-
-    const baseQuery = {
-      include: includeConfig,
-      orderBy: orderConfig,
     };
 
     if (esJefe) {
       return this.prisma.novedad.findMany({
-        ...baseQuery,
+        select: selectConfig,
+        orderBy: orderByConfig,
         where: {
           usuario: {
             usuario_tienda: {
@@ -62,7 +86,9 @@ export class NovedadeService {
       });
     }
 
-    // Para nómina
-    return this.prisma.novedad.findMany(baseQuery);
+    return this.prisma.novedad.findMany({
+      select: selectConfig,
+      orderBy: orderByConfig,
+    });
   }
 }

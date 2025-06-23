@@ -27,6 +27,8 @@ export class NovedadController {
       descripcion: string;
       idEstado: number;
       idTipoNovedad?: number;
+      esMasiva?: boolean;
+      cantidadSolicitudes?: number;
     },
   ) {
     return this.novedadService.crearNovedad(body);
