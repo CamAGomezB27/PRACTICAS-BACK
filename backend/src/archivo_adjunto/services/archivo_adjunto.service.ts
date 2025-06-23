@@ -96,6 +96,22 @@ export class ArchivoAdjuntoService {
     return Buffer.from(buffer);
   }
 
+  async validarArchivoBufferConMicroservicio(
+    buffer: Buffer,
+  ): Promise<ResultadoValidacion> {
+    const fs = await import('fs/promises');
+    const tempDir = path.resolve(__dirname, '..', '..', 'temp');
+    await fs.mkdir(tempDir, { recursive: true });
+
+    const tempPath = path.join(tempDir, 'archivo.xlsx');
+    await fs.writeFile(tempPath, buffer);
+
+    const resultado = await this.validarArchivoConMicroservicio(tempPath);
+
+    await fs.unlink(tempPath);
+    return resultado;
+  }
+
   async validarArchivoConMicroservicio(
     rutaArchivo: string,
   ): Promise<ResultadoValidacion> {

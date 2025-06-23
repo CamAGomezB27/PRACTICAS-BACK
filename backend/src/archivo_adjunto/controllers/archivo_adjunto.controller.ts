@@ -15,8 +15,9 @@ import { ArchivoAdjuntoService } from '../services/archivo_adjunto.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { NovedadeService } from 'src/novedad/services/novedad.service';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+// import { diskStorage } from 'multer';
+// import { extname } from 'path';
+import { memoryStorage } from 'multer';
 import { Express } from 'express';
 
 //Request de usuario
@@ -93,15 +94,7 @@ export class ArchivoAdjuntoController {
   @Post('subir-archivo')
   @UseInterceptors(
     FileInterceptor('archivo', {
-      storage: diskStorage({
-        destination: './uploads',
-        filename: (req, file, cb) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
-          const ext = extname(file.originalname);
-          cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
-        },
-      }),
+      storage: memoryStorage(),
       fileFilter: (req, file, cb) => {
         if (file.originalname.match(/\.(xlsx)$/)) {
           cb(null, true);
@@ -125,8 +118,8 @@ export class ArchivoAdjuntoController {
 
       //VALIDACIÓN DE ARCHIVO EN MICROSERVICIO
       const validacion: ResultadoValidacion =
-        await this.archivoAdjuntoService.validarArchivoConMicroservicio(
-          archivo.path,
+        await this.archivoAdjuntoService.validarArchivoBufferConMicroservicio(
+          archivo.buffer,
         );
 
       if (!validacion.valido) {
@@ -135,6 +128,11 @@ export class ArchivoAdjuntoController {
           errores: validacion.errores,
         };
       }
+
+      // Guardar archivosi pasó validación
+      const fs = await import('fs/promises');
+      const path = `./uploads/${Date.now()}-${archivo.originalname}`;
+      await fs.writeFile(path, archivo.buffer);
 
       const mapaTiposNovedad: Record<string, number> = {
         'Auxilio de transporte': 1,
