@@ -5,6 +5,7 @@ import { AuthModule } from '../auth/auth.module'; // importa el módulo de auth
 import { AppController } from './controllers/app.controller';
 import { ArchivoAdjuntoModule } from 'src/archivo_adjunto/archivo_adjunto.module';
 import { NovedadModule } from 'src/novedad/novedad.module';
+import { PrismaModule } from 'prisma/prisma.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { NovedadModule } from 'src/novedad/novedad.module';
     AuthModule,
     ArchivoAdjuntoModule,
     NovedadModule,
+    PrismaModule,
   ],
   controllers: [AppController],
 })

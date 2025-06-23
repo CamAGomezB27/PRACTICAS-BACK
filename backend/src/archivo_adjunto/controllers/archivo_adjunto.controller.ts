@@ -116,7 +116,7 @@ export class ArchivoAdjuntoController {
       console.log('📄 Archivo recibido:', archivo);
       const titulo = body.titulo;
 
-      //VALIDACIÓN DE ARCHIVO EN MICROSERVICIO
+      // ✅ VALIDACIÓN DE ARCHIVO
       const validacion: ResultadoValidacion =
         await this.archivoAdjuntoService.validarArchivoBufferConMicroservicio(
           archivo.buffer,
@@ -129,11 +129,7 @@ export class ArchivoAdjuntoController {
         };
       }
 
-      // Guardar archivosi pasó validación
-      const fs = await import('fs/promises');
-      const path = `./uploads/${Date.now()}-${archivo.originalname}`;
-      await fs.writeFile(path, archivo.buffer);
-
+      // ✅ CREACIÓN DE NOVEDAD
       const mapaTiposNovedad: Record<string, number> = {
         'Auxilio de transporte': 1,
         'Horas Extra': 2,
@@ -145,23 +141,27 @@ export class ArchivoAdjuntoController {
       };
 
       const idTipoNovedad = mapaTiposNovedad[titulo] ?? null;
-      //Registrar Novedad
+
       const novedad = await this.novedadService.crearNovedad({
         idUsuario: req.user.id_usuario,
         descripcion: `Archivo "${archivo.originalname}" subido exitosamente`,
-        idEstado: 1, //ID de estado CREADA
+        idEstado: 1, // Estado: CREADA
         idTipoNovedad,
       });
 
+      // PROCESAR Y GUARDAR
+      await this.archivoAdjuntoService.procesarYGuardarExcel(
+        archivo.buffer,
+        novedad.id_novedad,
+      );
+
       return {
-        message: 'Archivo subido correctamente',
-        nombreArchivo: archivo.filename,
-        ruta: archivo.path,
+        message: '✅ Archivo subido y procesado correctamente',
         usuario: req.user.nombre,
         novedadId: novedad.id_novedad,
       };
     } catch (error) {
-      console.error('❌ Error al subir archivo:', error);
+      console.error('❌ Error al subir y procesar archivo:', error);
       return {
         message: 'No se pudo subir el archivo',
         error: error instanceof Error ? error.stack : String(error),
