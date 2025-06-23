@@ -2,6 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { Workbook } from 'exceljs';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as FormData from 'form-data';
+import axios from 'axios';
+
+interface ResultadoValidacion {
+  valido: boolean;
+  errores?: string[];
+}
 
 @Injectable()
 export class ArchivoAdjuntoService {
@@ -87,5 +94,26 @@ export class ArchivoAdjuntoService {
 
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
+  }
+
+  async validarArchivoConMicroservicio(
+    rutaArchivo: string,
+  ): Promise<ResultadoValidacion> {
+    const form = new FormData();
+    form.append('file', fs.createReadStream(rutaArchivo));
+
+    try {
+      const response = await axios.post<ResultadoValidacion>(
+        'http://localhost:8001/validar/',
+        form,
+        {
+          headers: form.getHeaders(),
+        },
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error al validar el archivo:', error);
+      throw new Error('Error al conectarse con el microservicio de validación');
+    }
   }
 }

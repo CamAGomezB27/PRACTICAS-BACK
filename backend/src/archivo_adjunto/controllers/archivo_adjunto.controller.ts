@@ -34,6 +34,11 @@ interface ArchivoSubido {
   titulo: string;
 }
 
+interface ResultadoValidacion {
+  valido: boolean;
+  errores?: string[];
+}
+
 @Controller('archivo-adjunto')
 export class ArchivoAdjuntoController {
   constructor(
@@ -117,6 +122,20 @@ export class ArchivoAdjuntoController {
     try {
       console.log('📄 Archivo recibido:', archivo);
       const titulo = body.titulo;
+
+      //VALIDACIÓN DE ARCHIVO EN MICROSERVICIO
+      const validacion: ResultadoValidacion =
+        await this.archivoAdjuntoService.validarArchivoConMicroservicio(
+          archivo.path,
+        );
+
+      if (!validacion.valido) {
+        return {
+          message: '❌ El archivo contiene errores',
+          errores: validacion.errores,
+        };
+      }
+
       const mapaTiposNovedad: Record<string, number> = {
         'Auxilio de transporte': 1,
         'Horas Extra': 2,
