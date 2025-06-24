@@ -181,4 +181,39 @@ export class ArchivoAdjuntoController {
       };
     }
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('exportar-consolidado')
+  async exportarConsolidadoDesdeDatos(
+    @Body() datos: any[], // Aquí puedes tiparlo como `SolicitudConIdDetalle[]` si ya tienes la interfaz en común
+    @Res() res: Response,
+  ) {
+    try {
+      if (!datos || datos.length === 0) {
+        return res
+          .status(400)
+          .json({ message: 'No se recibieron datos para exportar' });
+      }
+
+      const buffer =
+        await this.archivoAdjuntoService.generarConsolidadoPostNomina(datos);
+
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      res.setHeader(
+        'Content-Disposition',
+        'attachment; filename=Consolidado_Post_Nomina.xlsx',
+      );
+
+      res.send(buffer);
+    } catch (error) {
+      console.error('❌ Error al generar Excel desde datos enviados:', error);
+      return res.status(500).json({
+        message: 'Error al generar archivo desde los datos proporcionados',
+        error: error instanceof Error ? error.stack : String(error),
+      });
+    }
+  }
 }

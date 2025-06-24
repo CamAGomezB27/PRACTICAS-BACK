@@ -13,6 +13,40 @@ interface RespuestaExitosa {
   cantidadSolicitudes: number;
 }
 
+interface Solicitud {
+  fecha: Date;
+  cedula: string;
+  nombre: string;
+  categoria: string;
+  tienda: string;
+  jefe: string;
+  detalle: string;
+}
+
+interface SolicitudConIdDetalle extends Solicitud {
+  id_novedad: number;
+  n: number;
+  jornada_empleado: string;
+  jornada_otro_si: string;
+  fecha_inicio: Date | null;
+  fecha_fin: Date | null;
+  salario_actual: number;
+  salario_otro_si: number;
+  consecutivo_forms: string;
+  concepto: string;
+  codigo_concepto: string;
+  unidades: number;
+  fecha_novedad: Date | null;
+  fecha_inicio_disfrute: Date | null;
+  fecha_fin_disfrute: Date | null;
+  responsable_validacion: string;
+  respuesta_validacion: string;
+  ajuste: string;
+  fecha_pago: Date | null;
+  area_responsable: string;
+  categoria_inconsistencia: string;
+}
+
 type RespuestaMicroservicio = string[] | RespuestaExitosa;
 interface ResultadoValidacion {
   valido: boolean;
@@ -459,5 +493,128 @@ export class ArchivoAdjuntoService {
       console.error(`Error obteniendo valor de celda ${col}:`, error);
       return 'NO APLICA';
     }
+  }
+
+  async generarConsolidadoPostNomina(
+    solicitudes: SolicitudConIdDetalle[],
+  ): Promise<Buffer> {
+    const archivoBase = 'Consolidado_Post_Nomina.xlsx';
+    const basePath = __dirname.includes('dist')
+      ? path.resolve(__dirname, '..', '..', '..', 'assets', 'templates')
+      : path.resolve(__dirname, '..', '..', 'assets', 'templates');
+
+    const plantillaPath = path.join(basePath, archivoBase);
+
+    try {
+      await fs.access(plantillaPath);
+      const buffer = await fs.readFile(plantillaPath);
+      const workbook = new Workbook();
+      await workbook.xlsx.load(buffer);
+      const sheet = workbook.getWorksheet(1);
+
+      if (!sheet) {
+        throw new Error('No se pudo cargar la hoja del archivo');
+      }
+
+      const filaInicio = 7;
+
+      solicitudes.forEach((s, index) => {
+        const fila = sheet.getRow(filaInicio + index);
+        fila.getCell('A').value = s.id_novedad;
+        fila.getCell('B').value = s.n ?? 0;
+        fila.getCell('C').value = this.formatDate(s.fecha);
+        fila.getCell('D').value = s.cedula;
+        fila.getCell('E').value = s.nombre;
+        fila.getCell('F').value = s.categoria;
+        fila.getCell('G').value = s.tienda;
+        fila.getCell('H').value = s.jefe;
+        fila.getCell('I').value = s.detalle;
+        fila.getCell('J').value = s.jornada_empleado;
+        fila.getCell('K').value = s.jornada_otro_si;
+        fila.getCell('L').value = this.formatDate(s.fecha_inicio);
+        fila.getCell('M').value = this.formatDate(s.fecha_fin);
+        fila.getCell('N').value = s.salario_actual;
+        fila.getCell('O').value = s.salario_otro_si;
+        fila.getCell('P').value = s.consecutivo_forms;
+        fila.getCell('Q').value = s.concepto;
+        fila.getCell('R').value = s.codigo_concepto;
+        fila.getCell('S').value = s.unidades;
+        fila.getCell('T').value = this.formatDate(s.fecha_novedad);
+        fila.getCell('U').value = this.formatDate(s.fecha_inicio_disfrute);
+        fila.getCell('V').value = this.formatDate(s.fecha_fin_disfrute);
+        fila.getCell('W').value = s.responsable_validacion;
+        fila.getCell('X').value = s.respuesta_validacion;
+        fila.getCell('Y').value = s.ajuste;
+        fila.getCell('Z').value = this.formatDate(s.fecha_pago);
+        fila.getCell('AA').value = s.area_responsable;
+        fila.getCell('AB').value = s.categoria_inconsistencia;
+        fila.commit();
+      });
+
+      const archivoFinal = await workbook.xlsx.writeBuffer();
+      return Buffer.from(archivoFinal);
+    } catch (err) {
+      const error = err as Error;
+      console.error(
+        '❌ Error generando Consolidado_Post_Nomina:',
+        error.message,
+      );
+      throw new Error('No se pudo generar el archivo consolidado.');
+    }
+  }
+
+  private formatDate(value: string | Date | null | undefined): string {
+    if (!value) return '';
+    const date = typeof value === 'string' ? new Date(value) : value;
+    if (!date || isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('es-CO');
+  }
+
+  async obtenerSolicitudesConsolidado(
+    id_novedad: number,
+  ): Promise<SolicitudConIdDetalle[]> {
+    const solicitudes = await this.prisma.detalleNovedadMasiva.findMany({
+      where: { id_novedad },
+      orderBy: { n: 'asc' },
+    });
+
+    return solicitudes.map((s) => {
+      if (!s.fecha) {
+        throw new Error(
+          `La solicitud con id ${s.id_detalle} no tiene fecha asignada`,
+        );
+      }
+
+      return {
+        ...s,
+        fecha: s.fecha, // Garantizado no null
+        n: s.n ?? 0,
+        jornada_empleado: s.jornada_empleado ?? '',
+        jornada_otro_si: s.jornada_otro_si ?? '',
+        salario_actual: s.salario_actual ?? 0,
+        salario_otro_si: s.salario_otro_si ?? 0,
+        consecutivo_forms: s.consecutivo_forms ?? '',
+        concepto: s.concepto ?? '',
+        codigo_concepto: s.codigo_concepto ?? '',
+        unidades: s.unidades ?? 0,
+        responsable_validacion: s.responsable_validacion ?? '',
+        respuesta_validacion: s.respuesta_validacion ?? '',
+        ajuste: s.ajuste ?? '',
+        area_responsable: s.area_responsable ?? '',
+        categoria_inconsistencia: s.categoria_inconsistencia ?? '',
+        detalle: s.detalle ?? '',
+        cedula: s.cedula ?? '',
+        nombre: s.nombre ?? '',
+        categoria: s.categoria ?? '',
+        tienda: s.tienda ?? '',
+        jefe: s.jefe ?? '',
+        fecha_inicio: s.fecha_inicio,
+        fecha_fin: s.fecha_fin,
+        fecha_novedad: s.fecha_novedad,
+        fecha_inicio_disfrute: s.fecha_inicio_disfrute,
+        fecha_fin_disfrute: s.fecha_fin_disfrute,
+        fecha_pago: s.fecha_pago,
+      };
+    });
   }
 }
