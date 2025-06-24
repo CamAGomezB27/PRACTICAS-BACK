@@ -1,6 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 
+interface FiltrosTienda {
+  tipo?: string;
+  fecha_novedad?: {
+    gte?: Date;
+    lte?: Date;
+  };
+}
+
 @Injectable()
 export class NovedadeService {
   constructor(private prisma: PrismaService) {}
@@ -128,7 +136,10 @@ export class NovedadeService {
     });
   }
 
-  async obtenerDetalleMasivoPorTienda(idUsuario: number) {
+  async obtenerDetalleMasivoPorTienda(
+    idUsuario: number,
+    filtros: FiltrosTienda = {},
+  ) {
     const usuarioConTienda = await this.prisma.usuario.findUnique({
       where: { id_usuario: idUsuario },
       select: {
@@ -149,11 +160,44 @@ export class NovedadeService {
 
     if (!nombreTienda) return [];
 
-    // 🔍 Aquí hacemos lo que te decía: guardar en variable y loguear
+    const whereCondition: Record<string, unknown> = {
+      tienda: nombreTienda,
+    };
+
+    console.log(
+      '🧪 whereCondition antes de Prisma.findMany():',
+      whereCondition,
+    );
+
+    if (filtros.tipo) {
+      whereCondition.categoria = {
+        equals: filtros.tipo,
+        mode: 'insensitive',
+      };
+    }
+
+    if (filtros.fecha_novedad) {
+      const fechaFiltro: { gte?: Date; lte?: Date } = {};
+
+      if (filtros.fecha_novedad.gte) {
+        fechaFiltro.gte = new Date(filtros.fecha_novedad.gte);
+      }
+
+      if (filtros.fecha_novedad.lte) {
+        fechaFiltro.lte = new Date(filtros.fecha_novedad.lte);
+      }
+
+      if (fechaFiltro.gte || fechaFiltro.lte) {
+        console.log(
+          '📅 Usando fechaFiltro CORREGIDO (sin alterar UTC):',
+          fechaFiltro,
+        );
+        whereCondition.fecha = fechaFiltro;
+      }
+    }
+
     const resultados = await this.prisma.detalleNovedadMasiva.findMany({
-      where: {
-        tienda: nombreTienda,
-      },
+      where: whereCondition,
       select: {
         id_novedad: true,
         n: true,
@@ -186,11 +230,10 @@ export class NovedadeService {
       },
     });
 
-    // 🧪 Log de prueba para ver si trajo algo
     console.log(
-      '📦 Resultados encontrados para tienda:',
+      '📦 Resultados con filtros para tienda:',
       nombreTienda,
-      '-',
+      '| Total:',
       resultados.length,
     );
 

@@ -6,6 +6,7 @@ import {
   Req,
   UseGuards,
   Param,
+  Query,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { NovedadeService } from '../services/novedad.service';
@@ -14,6 +15,14 @@ import { AuthGuard } from '@nestjs/passport';
 interface JwtPayload {
   id_usuario: number;
   esJefe: boolean;
+}
+
+interface FiltrosTienda {
+  tipo?: string;
+  fecha_novedad?: {
+    gte?: Date;
+    lte?: Date;
+  };
 }
 
 @Controller('novedad')
@@ -48,12 +57,35 @@ export class NovedadController {
   }
 
   @Get('masiva/tienda')
-  async obtenerConsolidadoPorTienda(@Req() req: Request) {
+  async obtenerConsolidadoPorTienda(
+    @Req() req: Request,
+    @Query('tipo') tipo?: string,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+  ) {
     const { id_usuario } = req.user as JwtPayload;
-    console.log(
-      '👉 Ruta alcanzada: /novedad/masiva/tienda por usuario:',
+
+    const filtros: FiltrosTienda = {};
+
+    if (tipo) filtros.tipo = tipo;
+    if (desde || hasta) {
+      const gte = desde ? new Date(desde) : undefined;
+      const lte = hasta ? new Date(hasta) : undefined;
+
+      // Validar que al menos una fecha sea válida
+      const isValidGte = gte && !isNaN(gte.getTime());
+      const isValidLte = lte && !isNaN(lte.getTime());
+
+      if (isValidGte || isValidLte) {
+        filtros.fecha_novedad = {};
+        if (isValidGte) filtros.fecha_novedad.gte = gte!;
+        if (isValidLte) filtros.fecha_novedad.lte = lte!;
+      }
+    }
+
+    return this.novedadService.obtenerDetalleMasivoPorTienda(
       id_usuario,
+      filtros,
     );
-    return this.novedadService.obtenerDetalleMasivoPorTienda(id_usuario);
   }
 }
