@@ -127,4 +127,73 @@ export class NovedadeService {
       },
     });
   }
+
+  async obtenerDetalleMasivoPorTienda(idUsuario: number) {
+    const usuarioConTienda = await this.prisma.usuario.findUnique({
+      where: { id_usuario: idUsuario },
+      select: {
+        usuario_tienda: {
+          select: {
+            tienda: {
+              select: {
+                nombre_tienda: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const nombreTienda =
+      usuarioConTienda?.usuario_tienda[0]?.tienda?.nombre_tienda;
+
+    if (!nombreTienda) return [];
+
+    // 🔍 Aquí hacemos lo que te decía: guardar en variable y loguear
+    const resultados = await this.prisma.detalleNovedadMasiva.findMany({
+      where: {
+        tienda: nombreTienda,
+      },
+      select: {
+        id_novedad: true,
+        n: true,
+        fecha: true,
+        cedula: true,
+        nombre: true,
+        categoria: true,
+        tienda: true,
+        jefe: true,
+        detalle: true,
+        jornada_empleado: true,
+        jornada_otro_si: true,
+        fecha_inicio: true,
+        fecha_fin: true,
+        salario_actual: true,
+        salario_otro_si: true,
+        consecutivo_forms: true,
+        concepto: true,
+        codigo_concepto: true,
+        unidades: true,
+        fecha_novedad: true,
+        fecha_inicio_disfrute: true,
+        fecha_fin_disfrute: true,
+        responsable_validacion: true,
+        respuesta_validacion: true,
+        ajuste: true,
+        fecha_pago: true,
+        area_responsable: true,
+        categoria_inconsistencia: true,
+      },
+    });
+
+    // 🧪 Log de prueba para ver si trajo algo
+    console.log(
+      '📦 Resultados encontrados para tienda:',
+      nombreTienda,
+      '-',
+      resultados.length,
+    );
+
+    return resultados;
+  }
 }

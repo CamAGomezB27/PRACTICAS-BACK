@@ -46,4 +46,14 @@ export class NovedadController {
   async obtenerDetalleMasivo(@Param('id') id: string) {
     return this.novedadService.obtenerDetalleMasivo(+id);
   }
+
+  @Get('masiva/tienda')
+  async obtenerConsolidadoPorTienda(@Req() req: Request) {
+    const { id_usuario } = req.user as JwtPayload;
+    console.log(
+      '👉 Ruta alcanzada: /novedad/masiva/tienda por usuario:',
+      id_usuario,
+    );
+    return this.novedadService.obtenerDetalleMasivoPorTienda(id_usuario);
+  }
 }
