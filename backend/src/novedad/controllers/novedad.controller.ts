@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Req,
+  UseGuards,
+  Param,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { NovedadeService } from '../services/novedad.service';
 import { AuthGuard } from '@nestjs/passport';
@@ -32,5 +40,10 @@ export class NovedadController {
     },
   ) {
     return this.novedadService.crearNovedad(body);
+  }
+
+  @Get(':id/masiva')
+  async obtenerDetalleMasivo(@Param('id') id: string) {
+    return this.novedadService.obtenerDetalleMasivo(+id);
   }
 }
