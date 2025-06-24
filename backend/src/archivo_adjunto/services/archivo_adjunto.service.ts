@@ -495,79 +495,160 @@ export class ArchivoAdjuntoService {
     }
   }
 
+  // Helpers de “seguridad” para cada tipo
+  private safeString(v: string | null | undefined): string {
+    return v && v.trim() !== '' ? v : 'NO APLICA';
+  }
+
+  private safeDate(v: Date | string | null | undefined): string {
+    if (!v) return '-';
+    const d = typeof v === 'string' ? new Date(v) : v;
+    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('es-CO');
+  }
+
+  private safeNumber(v: number | null | undefined): number {
+    return typeof v === 'number' && !isNaN(v) ? v : 0;
+  }
+
   async generarConsolidadoPostNomina(
     solicitudes: SolicitudConIdDetalle[],
   ): Promise<Buffer> {
-    const archivoBase = 'Consolidado_Post_Nomina.xlsx';
+    const archivoBase = 'Consolidado_PostNomina_Cierre.xlsx';
     const basePath = __dirname.includes('dist')
       ? path.resolve(__dirname, '..', '..', '..', 'assets', 'templates')
       : path.resolve(__dirname, '..', '..', 'assets', 'templates');
-
     const plantillaPath = path.join(basePath, archivoBase);
 
-    try {
-      await fs.access(plantillaPath);
-      const buffer = await fs.readFile(plantillaPath);
-      const workbook = new Workbook();
-      await workbook.xlsx.load(buffer);
-      const sheet = workbook.getWorksheet(1);
+    // helpers “seguros”
+    const safeString = (v?: string) => (v && v.trim() !== '' ? v : 'NO APLICA');
+    const safeNumber = (v?: number) =>
+      typeof v === 'number' && !isNaN(v) ? v : 0;
 
-      if (!sheet) {
-        throw new Error('No se pudo cargar la hoja del archivo');
+    // carga plantilla
+    await fs.access(plantillaPath);
+    const buf = await fs.readFile(plantillaPath);
+    const workbook = new Workbook();
+    await workbook.xlsx.load(buf);
+    const sheet = workbook.getWorksheet(1);
+    if (!sheet) throw new Error('No se pudo cargar la hoja');
+
+    const filaInicio = 7;
+    solicitudes.forEach((orig, idx) => {
+      const row = sheet.getRow(filaInicio + idx);
+
+      // ID y N
+      row.getCell('A').value = safeNumber(orig.id_novedad);
+      row.getCell('B').value = safeNumber(orig.n);
+
+      // Fecha (col C)
+      if (orig.fecha instanceof Date && !isNaN(orig.fecha.getTime())) {
+        row.getCell('C').value = orig.fecha;
+        row.getCell('C').numFmt = 'dd/mm/yyyy';
+      } else {
+        row.getCell('C').value = '-';
       }
 
-      const filaInicio = 7;
+      // Texto sencillo
+      row.getCell('D').value = safeString(orig.cedula);
+      row.getCell('E').value = safeString(orig.nombre);
+      row.getCell('F').value = safeString(orig.categoria);
+      row.getCell('G').value = safeString(orig.tienda);
+      row.getCell('H').value = safeString(orig.jefe);
+      row.getCell('I').value = safeString(orig.detalle);
 
-      solicitudes.forEach((s, index) => {
-        const fila = sheet.getRow(filaInicio + index);
-        fila.getCell('A').value = s.id_novedad;
-        fila.getCell('B').value = s.n ?? 0;
-        fila.getCell('C').value = this.formatDate(s.fecha);
-        fila.getCell('D').value = s.cedula;
-        fila.getCell('E').value = s.nombre;
-        fila.getCell('F').value = s.categoria;
-        fila.getCell('G').value = s.tienda;
-        fila.getCell('H').value = s.jefe;
-        fila.getCell('I').value = s.detalle;
-        fila.getCell('J').value = s.jornada_empleado;
-        fila.getCell('K').value = s.jornada_otro_si;
-        fila.getCell('L').value = this.formatDate(s.fecha_inicio);
-        fila.getCell('M').value = this.formatDate(s.fecha_fin);
-        fila.getCell('N').value = s.salario_actual;
-        fila.getCell('O').value = s.salario_otro_si;
-        fila.getCell('P').value = s.consecutivo_forms;
-        fila.getCell('Q').value = s.concepto;
-        fila.getCell('R').value = s.codigo_concepto;
-        fila.getCell('S').value = s.unidades;
-        fila.getCell('T').value = this.formatDate(s.fecha_novedad);
-        fila.getCell('U').value = this.formatDate(s.fecha_inicio_disfrute);
-        fila.getCell('V').value = this.formatDate(s.fecha_fin_disfrute);
-        fila.getCell('W').value = s.responsable_validacion;
-        fila.getCell('X').value = s.respuesta_validacion;
-        fila.getCell('Y').value = s.ajuste;
-        fila.getCell('Z').value = this.formatDate(s.fecha_pago);
-        fila.getCell('AA').value = s.area_responsable;
-        fila.getCell('AB').value = s.categoria_inconsistencia;
-        fila.commit();
-      });
+      // Jornada y demás strings
+      row.getCell('J').value = safeString(orig.jornada_empleado);
+      row.getCell('K').value = safeString(orig.jornada_otro_si);
 
-      const archivoFinal = await workbook.xlsx.writeBuffer();
-      return Buffer.from(archivoFinal);
-    } catch (err) {
-      const error = err as Error;
-      console.error(
-        '❌ Error generando Consolidado_Post_Nomina:',
-        error.message,
-      );
-      throw new Error('No se pudo generar el archivo consolidado.');
-    }
-  }
+      // Fecha Inicio (col L)
+      if (
+        orig.fecha_inicio instanceof Date &&
+        !isNaN(orig.fecha_inicio.getTime())
+      ) {
+        row.getCell('L').value = orig.fecha_inicio;
+        row.getCell('L').numFmt = 'dd/mm/yyyy';
+      } else {
+        row.getCell('L').value = '-';
+      }
 
-  private formatDate(value: string | Date | null | undefined): string {
-    if (!value) return '';
-    const date = typeof value === 'string' ? new Date(value) : value;
-    if (!date || isNaN(date.getTime())) return '';
-    return date.toLocaleDateString('es-CO');
+      // Fecha Fin (col M)
+      if (orig.fecha_fin instanceof Date && !isNaN(orig.fecha_fin.getTime())) {
+        row.getCell('M').value = orig.fecha_fin;
+        row.getCell('M').numFmt = 'dd/mm/yyyy';
+      } else {
+        row.getCell('M').value = '-';
+      }
+
+      // Números
+      row.getCell('N').value = safeNumber(orig.salario_actual);
+      row.getCell('O').value = safeNumber(orig.salario_otro_si);
+
+      // Strings
+      row.getCell('P').value = safeString(orig.consecutivo_forms);
+      row.getCell('Q').value = safeString(orig.concepto);
+      row.getCell('R').value = safeString(orig.codigo_concepto);
+
+      // Unidades
+      row.getCell('S').value = safeNumber(orig.unidades);
+
+      // Fecha novedad (col T)
+      if (
+        orig.fecha_novedad instanceof Date &&
+        !isNaN(orig.fecha_novedad.getTime())
+      ) {
+        row.getCell('T').value = orig.fecha_novedad;
+        row.getCell('T').numFmt = 'dd/mm/yyyy';
+      } else {
+        row.getCell('T').value = '-';
+      }
+
+      // Fecha disfrute inicio (U)
+      if (
+        orig.fecha_inicio_disfrute instanceof Date &&
+        !isNaN(orig.fecha_inicio_disfrute.getTime())
+      ) {
+        row.getCell('U').value = orig.fecha_inicio_disfrute;
+        row.getCell('U').numFmt = 'dd/mm/yyyy';
+      } else {
+        row.getCell('U').value = '-';
+      }
+
+      // Fecha disfrute fin (V)
+      if (
+        orig.fecha_fin_disfrute instanceof Date &&
+        !isNaN(orig.fecha_fin_disfrute.getTime())
+      ) {
+        row.getCell('V').value = orig.fecha_fin_disfrute;
+        row.getCell('V').numFmt = 'dd/mm/yyyy';
+      } else {
+        row.getCell('V').value = '-';
+      }
+
+      // Validaciones y ajuste
+      row.getCell('W').value = safeString(orig.responsable_validacion);
+      row.getCell('X').value = safeString(orig.respuesta_validacion);
+      row.getCell('Y').value = safeString(orig.ajuste);
+
+      // Fecha pago (Z)
+      if (
+        orig.fecha_pago instanceof Date &&
+        !isNaN(orig.fecha_pago.getTime())
+      ) {
+        row.getCell('Z').value = orig.fecha_pago;
+        row.getCell('Z').numFmt = 'dd/mm/yyyy';
+      } else {
+        row.getCell('Z').value = '-';
+      }
+
+      // Resto de strings
+      row.getCell('AA').value = safeString(orig.area_responsable);
+      row.getCell('AB').value = safeString(orig.categoria_inconsistencia);
+
+      row.commit();
+    });
+
+    const finalBuf = await workbook.xlsx.writeBuffer();
+    return Buffer.from(finalBuf);
   }
 
   async obtenerSolicitudesConsolidado(
