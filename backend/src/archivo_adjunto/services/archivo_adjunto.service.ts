@@ -323,12 +323,23 @@ export class ArchivoAdjuntoService {
     }
 
     if (typeof valor === 'string') {
+      // 👇 Intentamos parsear formato tipo "23/06/2025"
+      const partes = valor.split('/');
+      if (partes.length === 3) {
+        const dia = parseInt(partes[0], 10);
+        const mes = parseInt(partes[1], 10) - 1; // los meses en JS van de 0 a 11
+        const anio = parseInt(partes[2], 10);
+        const fecha = new Date(anio, mes, dia);
+        return isNaN(fecha.getTime()) ? null : fecha;
+      }
+
+      // Fallback: intentar parseo normal
       const fecha = new Date(valor);
       return isNaN(fecha.getTime()) ? null : fecha;
     }
 
     if (typeof valor === 'number') {
-      // Manejar fechas de Excel (número de días desde 1900)
+      // Fechas en formato Excel
       if (valor > 25000 && valor < 100000) {
         const fecha = new Date((valor - 25569) * 86400 * 1000);
         return isNaN(fecha.getTime()) ? null : fecha;
