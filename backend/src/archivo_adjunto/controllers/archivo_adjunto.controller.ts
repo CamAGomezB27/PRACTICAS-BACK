@@ -17,6 +17,7 @@ import { NovedadeService } from 'src/novedad/services/novedad.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { Express } from 'express';
+import { SolicitudConIdDetalle } from '../services/archivo_adjunto.service';
 
 // Request extendido con user
 interface AuthenticatedRequest extends Request {
@@ -185,7 +186,7 @@ export class ArchivoAdjuntoController {
   @UseGuards(JwtAuthGuard)
   @Post('exportar-consolidado')
   async exportarConsolidadoDesdeDatos(
-    @Body() datos: any[], // Aquí puedes tiparlo como `SolicitudConIdDetalle[]` si ya tienes la interfaz en común
+    @Body() datos: SolicitudConIdDetalle[],
     @Res() res: Response,
   ) {
     try {
@@ -195,18 +196,58 @@ export class ArchivoAdjuntoController {
           .json({ message: 'No se recibieron datos para exportar' });
       }
 
-      const buffer =
-        await this.archivoAdjuntoService.generarConsolidadoPostNomina(datos);
+      // 1) Genera el Excel en memoria
+      // Transformar campos clave del tipo string → Date (los obligatorios mínimo)
 
+      console.log('🟡 Datos recibidos del frontend:');
+      console.log(datos.map((d) => ({ id: d.id_novedad, fecha: d.fecha })));
+
+      const solicitudes: SolicitudConIdDetalle[] = datos.map((d) => ({
+        ...d,
+        fecha:
+          d.fecha && typeof d.fecha === 'string' && d.fecha.trim() !== ''
+            ? d.fecha
+            : '-', // o null si quieres que quede vacía en Excel
+
+        // El resto pueden mantenerse como están, si no son requeridos
+        fecha_inicio: d.fecha_inicio ? new Date(d.fecha_inicio) : null,
+        fecha_fin: d.fecha_fin ? new Date(d.fecha_fin) : null,
+        fecha_novedad: d.fecha_novedad ? new Date(d.fecha_novedad) : null,
+        fecha_inicio_disfrute: d.fecha_inicio_disfrute
+          ? new Date(d.fecha_inicio_disfrute)
+          : null,
+        fecha_fin_disfrute: d.fecha_fin_disfrute
+          ? new Date(d.fecha_fin_disfrute)
+          : null,
+        fecha_pago: d.fecha_pago ? new Date(d.fecha_pago) : null,
+      }));
+
+      const buffer =
+        await this.archivoAdjuntoService.generarConsolidadoPostNomina(
+          solicitudes,
+        );
+
+      // 2) Calcula la fecha actual en formato YYYY-MM-DD
+      const hoy = new Date();
+      const yyyy = hoy.getFullYear();
+      const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+      const dd = String(hoy.getDate()).padStart(2, '0');
+      const fechaStr = `${yyyy}-${mm}-${dd}`;
+
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="Consolidado_Post_Nomina_${fechaStr}.xlsx"`,
+      );
+
+      // 3) Fija cabeceras incluyendo la fecha en el filename
       res.setHeader(
         'Content-Type',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       );
-      res.setHeader(
-        'Content-Disposition',
-        'attachment; filename=Consolidado_Post_Nomina.xlsx',
-      );
 
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+
+      // 4) Envía el buffer
       res.send(buffer);
     } catch (error) {
       console.error('❌ Error al generar Excel desde datos enviados:', error);
