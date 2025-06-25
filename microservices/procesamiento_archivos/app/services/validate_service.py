@@ -64,6 +64,25 @@ async def validar_excel(
             "DIAS A TOMAR", "FECHA INICIO", "FECHA FIN"
         ]
     }
+    
+    CAMPOS_OBLIGATORIOS_POR_PLANTILLA = {
+        "SOLICITUDES.xlsx": [
+            "CEDULA", "NOMBRE (APELLIDOS-NOMBRES)", "DETALLE NOVEDAD"
+        ],
+        "SOLICITUDES2.xlsx": [
+            "CEDULA", "NOMBRE (APELLIDOS-NOMBRES)", "DETALLE NOVEDAD",
+            "CONCEPTO", "CON_CODIGO", "UNIDADES", "FECHA NOVEDAD"
+        ],
+        "SOLICITUDES3.xlsx": [
+            "CEDULA", "NOMBRE (APELLIDOS-NOMBRES)", "DETALLE NOVEDAD",
+            "JORNADA EMPLEADO", "JORNADA OTRO SI TEMPORAL", "FECHA INICIO", "FECHA FIN",
+            "SALARIO ACTUAL", "SALARIO OTRO SI TEMPORAL", "CONSECUTIVO FORMS"
+        ],
+        "SOLICITUDES4.xlsx": [
+            "CEDULA", "NOMBRE (APELLIDOS-NOMBRES)", "DETALLE NOVEDAD",
+            "DIAS A TOMAR", "FECHA INICIO", "FECHA FIN"
+        ]
+    }
 
     plantilla_esperada = TIPOS_PERMITIDOS[tipo]
     cabeceras_esperadas = [c.strip().upper() for c in cabeceras_por_tipo[plantilla_esperada]]
@@ -84,20 +103,23 @@ async def validar_excel(
             "errores": errores
         }
 
-    # Construir los campos obligatorios para verificación de contenido (si existen en cabeceras)
+    # Construir los campos obligatorios para verificación de contenido 
     campos_obligatorios = {}
-    for campo in ["CEDULA", "NOMBRE (APELLIDOS-NOMBRES)", "DETALLE NOVEDAD"]:
+    
+    campos_esperados = CAMPOS_OBLIGATORIOS_POR_PLANTILLA[plantilla_esperada]
+    
+    for campo in campos_esperados:
         if campo in encabezados_normalizados:
             campos_obligatorios[campo] = encabezados_normalizados.index(campo)
         else:
             errores.append(f"❌ Falta la columna obligatoria: {campo}")
 
-    if errores:
-        print("🛑 Errores por campos obligatorios:", errores)
-        return {
-            "valido": False,
-            "errores": errores
-        }
+        if errores:
+            print("🛑 Errores por campos obligatorios:", errores)
+            return {
+                "valido": False,
+                "errores": errores
+            }
 
     # Recorrer las filas
     for row_idx in range(6, sheet.max_row + 1):
