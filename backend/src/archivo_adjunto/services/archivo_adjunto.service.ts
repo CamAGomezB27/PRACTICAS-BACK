@@ -12,11 +12,6 @@ import { Prisma } from '@prisma/client';
 //   return v instanceof Date && !isNaN(v.getTime());
 // }
 
-interface RespuestaExitosa {
-  esMasiva: boolean;
-  cantidadSolicitudes: number;
-}
-
 interface Solicitud {
   fecha: Date | string; // ← aquí el cambio
   cedula: string;
@@ -51,8 +46,11 @@ export interface SolicitudConIdDetalle extends Solicitud {
   categoria_inconsistencia: string;
 }
 
-type RespuestaMicroservicio = string[] | RespuestaExitosa;
-interface ResultadoValidacion {
+type RespuestaMicroservicio =
+  | { valido: true; esMasiva: boolean; cantidadSolicitudes: number }
+  | { valido: false; errores: string[] };
+
+export interface ResultadoValidacion {
   valido: boolean;
   errores?: string[];
   cantidadSolicitudes?: number;
@@ -124,7 +122,11 @@ export class ArchivoAdjuntoService {
         row.getCell('A').value = i + 1;
 
         const fechaCell = row.getCell('B');
-        fechaCell.value = new Date();
+        const hoy = new Date();
+        const fechaUTC = new Date(
+          Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()),
+        );
+        fechaCell.value = fechaUTC;
         fechaCell.numFmt = 'dd/mm/yyyy';
 
         row.getCell('C').value = '';
@@ -150,30 +152,57 @@ export class ArchivoAdjuntoService {
   async validarArchivoBufferConMicroservicio(
     buffer: Buffer,
   ): Promise<ResultadoValidacion> {
-    const tempDir = path.resolve(__dirname, '..', '..', 'temp');
-
     try {
-      // Crear directorio temporal si no existe
-      await fs.mkdir(tempDir, { recursive: true });
+      const form = new FormData();
+      form.append('file', buffer, {
+        filename: 'archivo.xlsx',
+        contentType:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
 
-      const tempPath = path.join(tempDir, `archivo_${Date.now()}.xlsx`);
-      await fs.writeFile(tempPath, buffer);
+      const response = await axios.post(
+        'http://localhost:8001/validar/',
+        form,
+        {
+          headers: form.getHeaders(),
+          timeout: 30000,
+        },
+      );
 
-      const resultado = await this.validarArchivoConMicroservicio(tempPath);
+      // ✅ Aseguramos el tipo manualmente
+      const data = response.data as RespuestaMicroservicio;
 
-      // Limpiar archivo temporal
-      try {
-        await fs.unlink(tempPath);
-      } catch (unlinkError) {
-        console.warn('No se pudo eliminar el archivo temporal:', unlinkError);
+      if (data.valido === false) {
+        return {
+          valido: false,
+          errores: data.errores ?? ['Archivo no válido'],
+        };
       }
 
-      return resultado;
+      if (data.valido === true) {
+        return {
+          valido: true,
+          cantidadSolicitudes: data.cantidadSolicitudes ?? 0,
+        };
+      }
+
+      // fallback defensivo
+      return {
+        valido: false,
+        errores: ['Respuesta inesperada del microservicio'],
+      };
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : 'Error desconocido';
-      console.error('Error en validación con buffer:', error);
-      throw new Error(`Error al validar archivo: ${errorMessage}`);
+      console.error(
+        '❌ Error al validar el archivo desde buffer:',
+        errorMessage,
+      );
+
+      return {
+        valido: false,
+        errores: [errorMessage],
+      };
     }
   }
 
@@ -186,7 +215,7 @@ export class ArchivoAdjuntoService {
       const form = new FormData();
       form.append('file', fsSync.createReadStream(rutaArchivo));
 
-      const response = await axios.post<RespuestaMicroservicio>(
+      const response = await axios.post(
         'http://localhost:8001/validar/',
         form,
         {
@@ -195,20 +224,25 @@ export class ArchivoAdjuntoService {
         },
       );
 
-      const data = response.data;
+      const data = response.data as RespuestaMicroservicio;
 
-      // son errores
-      if (Array.isArray(data)) {
+      if ('valido' in data && data.valido === false) {
         return {
           valido: false,
-          errores: data,
+          errores: data.errores ?? ['Archivo no válido'],
         };
       }
 
-      //  todo está bien y nos devuelve la info masiva
+      if ('valido' in data && data.valido === true) {
+        return {
+          valido: true,
+          cantidadSolicitudes: data.cantidadSolicitudes ?? 0,
+        };
+      }
+
       return {
-        valido: true,
-        cantidadSolicitudes: data.cantidadSolicitudes,
+        valido: false,
+        errores: ['Respuesta inesperada del microservicio'],
       };
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
@@ -499,20 +533,20 @@ export class ArchivoAdjuntoService {
     }
   }
 
-  // // Helpers de “seguridad” para cada tipo
-  // private safeString(v: string | null | undefined): string {
-  //   return v && v.trim() !== '' ? v : 'NO APLICA';
-  // }
+  // Helpers de “seguridad” para cada tipo
+  private safeString(v: string | null | undefined): string {
+    return v && v.trim() !== '' ? v : 'NO APLICA';
+  }
 
-  // private safeDate(v: Date | string | null | undefined): string {
-  //   if (!v) return '-';
-  //   const d = typeof v === 'string' ? new Date(v) : v;
-  //   return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('es-CO');
-  // }
+  private safeDate(v: Date | string | null | undefined): string {
+    if (!v) return '-';
+    const d = typeof v === 'string' ? new Date(v) : v;
+    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('es-CO');
+  }
 
-  // private safeNumber(v: number | null | undefined): number {
-  //   return typeof v === 'number' && !isNaN(v) ? v : 0;
-  // }
+  private safeNumber(v: number | null | undefined): number {
+    return typeof v === 'number' && !isNaN(v) ? v : 0;
+  }
 
   async generarConsolidadoPostNomina(
     solicitudes: SolicitudConIdDetalle[],

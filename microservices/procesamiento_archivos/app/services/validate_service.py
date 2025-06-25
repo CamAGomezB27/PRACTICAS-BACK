@@ -12,7 +12,7 @@ async def validar_excel(file: UploadFile):
 
     encabezados = [cell.value for cell in sheet[5]]
     encabezados_normalizados = [str(h).strip().upper() if h else "" for h in encabezados]
-    print("Encabezados detectados:", encabezados_normalizados)
+    print("📌 Encabezados detectados:", encabezados_normalizados)
 
     alias_columnas = {
         "CEDULA": ["CEDULA"],
@@ -26,44 +26,59 @@ async def validar_excel(file: UploadFile):
         found = False
         for nombre in posibles_nombres:
             if nombre in encabezados_normalizados:
-                campos_obligatorios[campo] = encabezados_normalizados.index(nombre)
+                col_idx = encabezados_normalizados.index(nombre)
+                campos_obligatorios[campo] = col_idx
                 found = True
+                print(f"✅ Columna obligatoria '{campo}' encontrada en la posición {col_idx + 1}")
                 break
         if not found:
-            errores.append(f"Falta la columna obligatoria: {campo}")
+            errores.append(f"❌ Falta la columna obligatoria: {campo}")
 
     if errores:
-        print("❌ Errores de encabezado:", errores)
+        print("🛑 Errores de encabezado:", errores)
         return {
             "valido": False,
             "errores": errores
         }
 
+    # Recorrer las filas
     for row_idx in range(6, sheet.max_row + 1):
         fila = sheet[row_idx]
         fila_visible = any(cell.value is not None for cell in fila)
 
         if not fila_visible:
+            print(f"⚪ Fila {row_idx} vacía. Saltando...")
             continue
 
-        print(f"Validando fila {row_idx}...")
-
+        print(f"\n🔍 Validando fila {row_idx}...")
         fila_valida = True
+
         for campo, col_idx in campos_obligatorios.items():
             cell = fila[col_idx]
-            if cell.value is None or str(cell.value).strip() == "":
-                errores.append(f"Fila {row_idx}: El campo obligatorio '{campo}' está vacío.")
+            valor = cell.value
+
+            if valor is None or str(valor).strip() == "":
+                mensaje_error = f"❌ Fila {row_idx}, Columna {col_idx + 1} ({campo}): VACÍA"
+                print(mensaje_error)
+                errores.append(mensaje_error)
                 fila_valida = False
+            else:
+                print(f"✅ Fila {row_idx}, Columna {col_idx + 1} ({campo}): OK → '{valor}'")
 
         if fila_valida:
+            print(f"✅ Fila {row_idx} completa y válida.")
             cantidad_solicitudes += 1
+        else:
+            print(f"⚠️ Fila {row_idx} tiene errores.")
 
     if errores:
+        print("\n🛑 Validación terminada con errores.")
         return {
             "valido": False,
             "errores": errores
         }
 
+    print(f"\n✅ Validación exitosa. Total solicitudes válidas: {cantidad_solicitudes}")
     return {
         "valido": True,
         "esMasiva": True,

@@ -98,6 +98,7 @@ export class ArchivoAdjuntoController {
   @UseInterceptors(
     FileInterceptor('archivo', {
       storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
       fileFilter: (req, file, cb) => {
         if (file.originalname.match(/\.(xlsx)$/)) {
           cb(null, true);
@@ -105,21 +106,17 @@ export class ArchivoAdjuntoController {
           cb(new Error('Solo se permiten archivos .xlsx'), false);
         }
       },
-      limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB
-      },
     }),
   )
   async subirArchivo(
     @UploadedFile() archivo: Express.Multer.File,
     @Req() req: AuthenticatedRequest,
     @Body() body: ArchivoSubido,
-  ) {
+  ): Promise<any> {
     try {
       console.log('📄 Archivo recibido:', archivo);
       const titulo = body.titulo;
 
-      // ✅ VALIDACIÓN DE ARCHIVO
       const validacion: ResultadoValidacion =
         await this.archivoAdjuntoService.validarArchivoBufferConMicroservicio(
           archivo.buffer,
@@ -128,16 +125,15 @@ export class ArchivoAdjuntoController {
       console.log('🧪 Resultado de validación:', validacion);
 
       if (!validacion.valido) {
+        console.log('🛑 Archivo con errores. Cancelando guardado.');
         return {
-          message: '❌ El archivo contiene errores',
+          valido: false,
           errores: validacion.errores,
         };
       }
 
-      // Capturar la cantidad de solicitudes detectadas
       const cantidad = validacion.cantidadSolicitudes ?? 0;
 
-      // CREACIÓN DE NOVEDAD
       const mapaTiposNovedad: Record<string, number> = {
         'Auxilio de transporte': 1,
         'Horas Extra': 2,
@@ -150,25 +146,22 @@ export class ArchivoAdjuntoController {
 
       const idTipoNovedad = mapaTiposNovedad[titulo] ?? null;
 
-      console.log('🧪 Resultado de validación:', validacion);
-      console.log('Cantidad detectada:', validacion.cantidadSolicitudes);
-
       const novedad = await this.novedadService.crearNovedad({
         idUsuario: req.user.id_usuario,
         descripcion: `Archivo "${archivo.originalname}" subido exitosamente`,
-        idEstado: 1, // Estado: CREADA
+        idEstado: 1,
         idTipoNovedad,
         esMasiva: true,
         cantidadSolicitudes: cantidad,
       });
 
-      // PROCESAR Y GUARDAR
       await this.archivoAdjuntoService.procesarYGuardarExcel(
         archivo.buffer,
         novedad.id_novedad,
       );
 
       return {
+        valido: true,
         message: '✅ Archivo subido y procesado correctamente',
         usuario: req.user.nombre,
         novedadId: novedad.id_novedad,
@@ -177,6 +170,7 @@ export class ArchivoAdjuntoController {
     } catch (error) {
       console.error('❌ Error al subir y procesar archivo:', error);
       return {
+        valido: false,
         message: 'No se pudo subir el archivo',
         error: error instanceof Error ? error.stack : String(error),
       };
@@ -196,9 +190,6 @@ export class ArchivoAdjuntoController {
           .json({ message: 'No se recibieron datos para exportar' });
       }
 
-      // 1) Genera el Excel en memoria
-      // Transformar campos clave del tipo string → Date (los obligatorios mínimo)
-
       console.log('🟡 Datos recibidos del frontend:');
       console.log(datos.map((d) => ({ id: d.id_novedad, fecha: d.fecha })));
 
@@ -207,9 +198,7 @@ export class ArchivoAdjuntoController {
         fecha:
           d.fecha && typeof d.fecha === 'string' && d.fecha.trim() !== ''
             ? d.fecha
-            : '-', // o null si quieres que quede vacía en Excel
-
-        // El resto pueden mantenerse como están, si no son requeridos
+            : '-',
         fecha_inicio: d.fecha_inicio ? new Date(d.fecha_inicio) : null,
         fecha_fin: d.fecha_fin ? new Date(d.fecha_fin) : null,
         fecha_novedad: d.fecha_novedad ? new Date(d.fecha_novedad) : null,
@@ -227,7 +216,6 @@ export class ArchivoAdjuntoController {
           solicitudes,
         );
 
-      // 2) Calcula la fecha actual en formato YYYY-MM-DD
       const hoy = new Date();
       const yyyy = hoy.getFullYear();
       const mm = String(hoy.getMonth() + 1).padStart(2, '0');
@@ -238,16 +226,12 @@ export class ArchivoAdjuntoController {
         'Content-Disposition',
         `attachment; filename="Consolidado_Post_Nomina_${fechaStr}.xlsx"`,
       );
-
-      // 3) Fija cabeceras incluyendo la fecha en el filename
       res.setHeader(
         'Content-Type',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       );
-
       res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
 
-      // 4) Envía el buffer
       res.send(buffer);
     } catch (error) {
       console.error('❌ Error al generar Excel desde datos enviados:', error);
