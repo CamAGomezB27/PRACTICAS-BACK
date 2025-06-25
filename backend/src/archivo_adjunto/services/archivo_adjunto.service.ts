@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { Workbook, Row } from 'exceljs';
-import * as path from 'path';
-import * as fs from 'fs/promises';
-import * as fsSync from 'fs';
-import * as FormData from 'form-data';
-import axios from 'axios';
-import { PrismaService } from 'prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import axios from 'axios';
+import { Row, Workbook } from 'exceljs';
+import * as FormData from 'form-data';
+import * as fsSync from 'fs';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { PrismaService } from 'prisma/prisma.service';
 
 interface Solicitud {
   fecha: Date | string;
@@ -125,12 +125,9 @@ export class ArchivoAdjuntoService {
         fechaCell.value = fechaUTC;
         fechaCell.numFmt = 'dd/mm/yyyy';
 
-        row.getCell('C').value = '';
-        row.getCell('D').value = '';
         row.getCell('E').value = titulo;
         row.getCell('F').value = nombreTienda;
         row.getCell('G').value = nombreUsuario;
-        row.getCell('H').value = '';
 
         row.commit();
       }
@@ -148,6 +145,9 @@ export class ArchivoAdjuntoService {
   async validarArchivoBufferConMicroservicio(
     buffer: Buffer,
     tipo: string,
+    titulo: string,
+    nombreUsuario: string,
+    nombreTienda: string,
   ): Promise<ResultadoValidacion> {
     try {
       const form = new FormData();
@@ -157,6 +157,9 @@ export class ArchivoAdjuntoService {
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
       form.append('tipo', tipo);
+      form.append('titulo', titulo);
+      form.append('nombreUsuario', nombreUsuario);
+      form.append('nombreTienda', nombreTienda);
 
       const response = await axios.post(
         'http://localhost:8001/validar/',

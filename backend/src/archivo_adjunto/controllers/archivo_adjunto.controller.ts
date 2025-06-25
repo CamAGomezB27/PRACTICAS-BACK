@@ -1,23 +1,24 @@
 import {
+  Body,
   Controller,
   Get,
-  Query,
-  Res,
-  Req,
-  UseGuards,
-  UploadedFile,
-  UseInterceptors,
   Post,
-  Body,
+  Query,
+  Req,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { Response, Request } from 'express';
-import { ArchivoAdjuntoService } from '../services/archivo_adjunto.service';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Request, Response } from 'express';
+import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { NovedadeService } from 'src/novedad/services/novedad.service';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { memoryStorage } from 'multer';
-import { Express } from 'express';
-import { SolicitudConIdDetalle } from '../services/archivo_adjunto.service';
+import {
+  ArchivoAdjuntoService,
+  SolicitudConIdDetalle,
+} from '../services/archivo_adjunto.service';
 
 // Request extendido con user
 interface AuthenticatedRequest extends Request {
@@ -34,6 +35,8 @@ interface AuthenticatedRequest extends Request {
 interface ArchivoSubido {
   titulo: string;
   tipo: string;
+  nombreUsuario: string;
+  nombreTienda: string;
 }
 
 // Resultado de validación
@@ -97,7 +100,7 @@ export class ArchivoAdjuntoController {
   @UseGuards(JwtAuthGuard)
   @Post('subir-archivo')
   @UseInterceptors(
-    FileInterceptor('archivo', {
+    FileInterceptor('file', {
       storage: memoryStorage(),
       limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
       fileFilter: (req, file, cb) => {
@@ -143,6 +146,9 @@ export class ArchivoAdjuntoController {
         await this.archivoAdjuntoService.validarArchivoBufferConMicroservicio(
           archivo.buffer,
           tipo,
+          titulo,
+          req.user.nombre,
+          req.user.nombreTienda,
         );
 
       console.log('🧪 Resultado de validación:', validacion);
