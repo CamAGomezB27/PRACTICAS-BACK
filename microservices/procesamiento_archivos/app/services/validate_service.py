@@ -2,9 +2,25 @@ from fastapi import UploadFile
 import openpyxl
 from io import BytesIO
 
-async def validar_excel(file: UploadFile):
+TIPOS_PERMITIDOS = {
+    "Auxilio de transporte": "SOLICITUDES.xlsx",
+    "Otros": "SOLICITUDES.xlsx",
+    "Otro Si Definitivo": "SOLICITUDES.xlsx",
+    "Horas Extra": "SOLICITUDES2.xlsx",
+    "Otro Si Temporal": "SOLICITUDES3.xlsx",
+    "Vacaciones": "SOLICITUDES4.xlsx",
+}
+
+async def validar_excel(file: UploadFile, tipo: str):
     errores = []
-    cantidad_solicitudes = 0  # ✅ Contador de filas válidas
+    cantidad_solicitudes = 0  # Contador de filas válidas
+    
+    if tipo not in TIPOS_PERMITIDOS:
+        return {
+            "valido": False,
+            "errores": [f"❌ Tipo de solicitud '{tipo}' no es válido."]
+        }
+
 
     content = await file.read()
     wb = openpyxl.load_workbook(filename=BytesIO(content), data_only=True)
@@ -75,12 +91,15 @@ async def validar_excel(file: UploadFile):
         print("\n🛑 Validación terminada con errores.")
         return {
             "valido": False,
-            "errores": errores
+            "errores": errores,
+            "tipoValidado": tipo, #Tipo que se envio 
+            "cantiddadSolicitudes": cantidad_solicitudes
         }
 
     print(f"\n✅ Validación exitosa. Total solicitudes válidas: {cantidad_solicitudes}")
     return {
         "valido": True,
         "esMasiva": True,
-        "cantidadSolicitudes": cantidad_solicitudes
+        "cantidadSolicitudes": cantidad_solicitudes,
+        "tipoValidado": tipo, #Confirmación
     }

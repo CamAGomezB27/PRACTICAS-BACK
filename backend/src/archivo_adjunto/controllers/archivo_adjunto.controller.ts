@@ -33,6 +33,7 @@ interface AuthenticatedRequest extends Request {
 // Body del archivo subido
 interface ArchivoSubido {
   titulo: string;
+  tipo: string;
 }
 
 // Resultado de validación
@@ -115,11 +116,33 @@ export class ArchivoAdjuntoController {
   ): Promise<any> {
     try {
       console.log('📄 Archivo recibido:', archivo);
+
       const titulo = body.titulo;
+      const tipo = body.tipo;
+      const nombreArchivo = archivo.originalname;
+
+      //NOMBRE DEL ARCHIVO ASIGNADO POR EL FROTEND
+      const regexNombreValido = new RegExp(
+        `^Plantilla_${titulo}( \\(\\d+\\))?\\.xlsx$`,
+      );
+
+      if (!regexNombreValido.test(nombreArchivo)) {
+        console.warn(
+          `❌ Nombre de archivo inválido. Se esperaba algo como: Plantilla_${titulo}.xlsx, pero llegó: ${nombreArchivo}`,
+        );
+        return {
+          valido: false,
+          errores: [
+            `Debes subir un archivo llamado "Plantilla_${titulo}.xlsx" o versiones como "Plantilla_${titulo} (1).xlsx".`,
+            `Archivo recibido: "${nombreArchivo}".`,
+          ],
+        };
+      }
 
       const validacion: ResultadoValidacion =
         await this.archivoAdjuntoService.validarArchivoBufferConMicroservicio(
           archivo.buffer,
+          tipo,
         );
 
       console.log('🧪 Resultado de validación:', validacion);

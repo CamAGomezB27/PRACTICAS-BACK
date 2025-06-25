@@ -8,12 +8,8 @@ import axios from 'axios';
 import { PrismaService } from 'prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
-// function isValidDate(v: unknown): v is Date {
-//   return v instanceof Date && !isNaN(v.getTime());
-// }
-
 interface Solicitud {
-  fecha: Date | string; // ← aquí el cambio
+  fecha: Date | string;
   cedula: string;
   nombre: string;
   categoria: string;
@@ -151,6 +147,7 @@ export class ArchivoAdjuntoService {
 
   async validarArchivoBufferConMicroservicio(
     buffer: Buffer,
+    tipo: string,
   ): Promise<ResultadoValidacion> {
     try {
       const form = new FormData();
@@ -159,6 +156,7 @@ export class ArchivoAdjuntoService {
         contentType:
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
+      form.append('tipo', tipo);
 
       const response = await axios.post(
         'http://localhost:8001/validar/',
