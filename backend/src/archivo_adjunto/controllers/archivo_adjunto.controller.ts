@@ -177,7 +177,7 @@ export class ArchivoAdjuntoController {
 
       const novedad = await this.novedadService.crearNovedad({
         idUsuario: req.user.id_usuario,
-        descripcion: `Archivo "${archivo.originalname}" subido exitosamente`,
+        descripcion: `Archivo subido correctamente para validar`,
         idEstado: 1,
         idTipoNovedad,
         esMasiva: true,
