@@ -24,6 +24,7 @@ interface FiltrosTienda {
     gte?: Date;
     lte?: Date;
   };
+  estado?: string;
 }
 
 interface FiltrosParaNomina {
@@ -230,5 +231,26 @@ export class NovedadController {
       body.nuevoEstadoId,
       id_usuario,
     );
+  }
+
+  @Get('consolidado-pendientes-nomina')
+  async obtenerNovedadesPendientes(
+    @Query('tienda') tienda: string,
+    @Query('tipo') tipo: string,
+    @Query('desde') desde: string,
+    @Query('hasta') hasta: string,
+  ) {
+    const filtros: FiltrosParaNomina = {};
+
+    if (tienda) filtros.tienda = tienda;
+    if (tipo) filtros.tipo = tipo;
+
+    if (desde || hasta) {
+      filtros.fecha = {};
+      if (desde) filtros.fecha.gte = new Date(desde);
+      if (hasta) filtros.fecha.lte = new Date(hasta);
+    }
+
+    return this.novedadService.obtenerDetallesPendientesParaNomina(filtros);
   }
 }

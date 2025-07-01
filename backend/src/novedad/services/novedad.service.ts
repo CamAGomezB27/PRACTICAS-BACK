@@ -16,6 +16,7 @@ interface FiltrosParaNomina {
     gte?: Date;
     lte?: Date;
   };
+  estado?: string;
 }
 
 @Injectable()
@@ -541,6 +542,100 @@ export class NovedadeService {
       },
       orderBy: {
         fecha_creacion: 'desc',
+      },
+    });
+  }
+
+  async obtenerDetallesPendientesParaNomina(filtros: FiltrosParaNomina = {}) {
+    const whereCondition: Record<string, any> = {
+      novedad: {
+        estado_novedad: {
+          nombre_estado: {
+            equals: 'CREADA', // o 'PENDIENTE' si así está en la BD
+            mode: 'insensitive',
+          },
+        },
+      },
+    };
+
+    if (filtros.tienda) {
+      whereCondition.tienda = {
+        equals: filtros.tienda,
+        mode: 'insensitive',
+      };
+    }
+
+    if (filtros.tipo) {
+      whereCondition.categoria = {
+        equals: filtros.tipo,
+        mode: 'insensitive',
+      };
+    }
+
+    if (filtros.fecha) {
+      const fechaFiltro: { gte?: Date; lte?: Date } = {};
+
+      if (filtros.fecha.gte) {
+        fechaFiltro.gte = new Date(
+          filtros.fecha.gte.getFullYear(),
+          filtros.fecha.gte.getMonth(),
+          filtros.fecha.gte.getDate(),
+          0,
+          0,
+          0,
+          0,
+        );
+      }
+
+      if (filtros.fecha.lte) {
+        fechaFiltro.lte = new Date(
+          filtros.fecha.lte.getFullYear(),
+          filtros.fecha.lte.getMonth(),
+          filtros.fecha.lte.getDate(),
+          23,
+          59,
+          59,
+          999,
+        );
+      }
+
+      if (fechaFiltro.gte || fechaFiltro.lte) {
+        whereCondition.fecha = fechaFiltro;
+      }
+    }
+
+    return this.prisma.detalleNovedadMasiva.findMany({
+      where: whereCondition,
+      orderBy: { fecha: 'asc' },
+      select: {
+        id_novedad: true,
+        n: true,
+        fecha: true,
+        cedula: true,
+        nombre: true,
+        categoria: true,
+        tienda: true,
+        jefe: true,
+        detalle: true,
+        jornada_empleado: true,
+        jornada_otro_si: true,
+        fecha_inicio: true,
+        fecha_fin: true,
+        salario_actual: true,
+        salario_otro_si: true,
+        consecutivo_forms: true,
+        concepto: true,
+        codigo_concepto: true,
+        unidades: true,
+        fecha_novedad: true,
+        fecha_inicio_disfrute: true,
+        fecha_fin_disfrute: true,
+        responsable_validacion: true,
+        respuesta_validacion: true,
+        ajuste: true,
+        fecha_pago: true,
+        area_responsable: true,
+        categoria_inconsistencia: true,
       },
     });
   }

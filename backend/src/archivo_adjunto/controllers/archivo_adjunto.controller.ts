@@ -340,4 +340,77 @@ export class ArchivoAdjuntoController {
       });
     }
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('exportar-archivo-respuesta-masiva')
+  async exportarArchivoRespuestaMasiva(
+    @Body() datos: FilaParaExportar[],
+    @Res() res: Response,
+  ) {
+    try {
+      if (!datos || datos.length === 0) {
+        return res.status(400).json({ message: 'No hay datos para exportar.' });
+      }
+
+      console.log(
+        '🟢 Recibiendo datos para exportación masiva...',
+        datos.length,
+      );
+
+      // 🔧 Generar el archivo con los datos
+      const buffer =
+        await this.archivoAdjuntoService.generarDesdeVistaPrevia(datos);
+
+      // 🧠 Extraer categorías únicas
+      const categorias = Array.from(
+        new Set(
+          datos
+            .map((d) => d.detalle || d.concepto || '')
+            .filter((cat) => cat.trim() !== '')
+            .map((cat) =>
+              cat
+                .normalize('NFD') // quita tildes
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/\s+/g, '_') // espacios a guiones bajos
+                .toUpperCase(),
+            ),
+        ),
+      );
+
+      const categoriasStr = categorias.join('_') || 'SIN_CATEGORIAS';
+
+      // 📅 Fecha actual
+      const fecha = new Date();
+      const fechaStr = fecha
+        .toLocaleDateString('es-CO', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        })
+        .replace(/\//g, '-');
+
+      // 🗂️ Nombre final del archivo
+      const filename = `Respuesta_Masiva_${categoriasStr}_${fechaStr}.xlsx`;
+
+      // 🧾 Headers
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${filename}"`,
+      );
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+
+      // 📤 Enviar archivo
+      res.send(buffer);
+    } catch (error) {
+      console.error('❌ Error al exportar archivo masivo:', error);
+      return res.status(500).json({
+        message: 'Error al generar Excel de respuesta masiva',
+        error: error instanceof Error ? error.stack : String(error),
+      });
+    }
+  }
 }
