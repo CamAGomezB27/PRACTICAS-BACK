@@ -19,7 +19,7 @@ interface JwtPayload {
 
 interface FiltrosTienda {
   tipo?: string;
-  fecha_novedad?: {
+  fecha?: {
     gte?: Date;
     lte?: Date;
   };
@@ -70,16 +70,34 @@ export class NovedadController {
     if (tipo) filtros.tipo = tipo;
     if (desde || hasta) {
       const gte = desde ? new Date(desde) : undefined;
-      const lte = hasta ? new Date(hasta) : undefined;
+
+      function obtenerFinDelDiaEnUTC(fecha: string): Date {
+        const soloFecha = fecha.split('T')[0]; // ← corta antes de la "T"
+        const partes = soloFecha.split('-');
+
+        if (partes.length !== 3)
+          throw new Error(`Formato de fecha inválido: ${fecha}`);
+
+        const [año, mes, dia] = partes.map(Number);
+        const fechaLocal = new Date(año, mes - 1, dia, 23, 59, 59, 999);
+
+        if (isNaN(fechaLocal.getTime())) {
+          throw new Error(`Fecha inválida construida: ${fecha}`);
+        }
+
+        return fechaLocal;
+      }
+
+      const lte = hasta ? obtenerFinDelDiaEnUTC(hasta) : undefined;
 
       // Validar que al menos una fecha sea válida
       const isValidGte = gte && !isNaN(gte.getTime());
       const isValidLte = lte && !isNaN(lte.getTime());
 
       if (isValidGte || isValidLte) {
-        filtros.fecha_novedad = {};
-        if (isValidGte) filtros.fecha_novedad.gte = gte!;
-        if (isValidLte) filtros.fecha_novedad.lte = lte!;
+        filtros.fecha = {};
+        if (isValidGte) filtros.fecha.gte = gte!;
+        if (isValidLte) filtros.fecha.lte = lte!;
       }
     }
 
@@ -87,20 +105,5 @@ export class NovedadController {
       id_usuario,
       filtros,
     );
-  }
-
-  @Get('todas')
-  async obtenerTodasLasNovedades(
-    @Query('tienda') tienda?: string,
-    @Query('tipo') tipo?: string,
-    @Query('desde') desde?: string,
-    @Query('hasta') hasta?: string,
-  ) {
-    return this.novedadService.obtenerTodasNovedadesFiltradas({
-      tienda,
-      tipo,
-      desde,
-      hasta,
-    });
   }
 }
