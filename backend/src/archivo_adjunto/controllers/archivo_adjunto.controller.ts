@@ -318,17 +318,7 @@ export class ArchivoAdjuntoController {
 
       // datos para el nombre del archivo
       const primera = datos[0];
-      const fechaFormateada = primera.fecha
-        ? new Date(primera.fecha)
-            .toLocaleDateString('es-CO', {
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-            })
-            .replace(/\//g, '-')
-        : 'fecha-desconocida';
-
-      const filename = `Respuesta_Solicitud_${primera.id ?? 'ID'}_${primera.concepto ?? 'Concepto'}_${primera.tienda ?? 'Tienda'}_${fechaFormateada}.xlsx`;
+      const filename = `Respuesta_Solicitud_${primera.id ?? 'ID'}_${primera.tienda ?? 'Tienda'}.xlsx`;
 
       // Headers
       res.setHeader(
