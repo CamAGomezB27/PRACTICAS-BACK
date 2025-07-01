@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -116,7 +117,7 @@ export class NovedadController {
     );
   }
 
-  @Get('todas')
+  @Get('novedades-pendientes')
   async obtenerTodasPendientes(
     @Query('tienda') tienda?: string,
     @Query('tipo') tipo?: string,
@@ -155,6 +156,45 @@ export class NovedadController {
     return this.novedadService.obtenerNovedadesPendientesParaNomina(filtros);
   }
 
+  @Get('todas-las-novedades')
+  async obtenerTodasLasNovedades(
+    @Query('tienda') tienda?: string,
+    @Query('tipo') tipo?: string,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+  ) {
+    const filtros: FiltrosParaNomina = {};
+
+    if (tienda) filtros.tienda = tienda;
+    if (tipo) filtros.tipo = tipo;
+
+    if (desde || hasta) {
+      const gte = desde ? new Date(desde) : undefined;
+      const lte = hasta ? new Date(hasta) : undefined;
+
+      if (gte && !isNaN(gte.getTime())) {
+        filtros.fecha = { ...filtros.fecha, gte };
+      }
+
+      if (lte && !isNaN(lte.getTime())) {
+        filtros.fecha = {
+          ...filtros.fecha,
+          lte: new Date(
+            lte.getFullYear(),
+            lte.getMonth(),
+            lte.getDate(),
+            23,
+            59,
+            59,
+            999,
+          ),
+        };
+      }
+    }
+
+    return this.novedadService.obtenerTodasNovedadesParaNomina(filtros);
+  }
+
   @Get('consolidado-nomina')
   async obtenerConsolidadoCompleto(
     @Query('tienda') tienda: string,
@@ -174,5 +214,21 @@ export class NovedadController {
     }
 
     return this.novedadService.obtenerDetallesParaConsolidado(filtros);
+  }
+
+  @Put(':id/cambiar-estado')
+  async cambiarEstado(
+    @Param('id') id: string,
+    @Body() body: { nuevoEstadoId: number },
+    @Req() req: Request,
+  ) {
+    const { id_usuario } = req.user as JwtPayload;
+    const idNovedad = parseInt(id, 10);
+
+    return this.novedadService.cambiarEstadoNovedad(
+      idNovedad,
+      body.nuevoEstadoId,
+      id_usuario,
+    );
   }
 }

@@ -471,4 +471,77 @@ export class NovedadeService {
       },
     });
   }
+
+  async cambiarEstadoNovedad(
+    idNovedad: number,
+    nuevoEstadoId: number,
+    idUsuario: number,
+  ) {
+    // Cambiar estado en la novedad
+    await this.prisma.novedad.update({
+      where: { id_novedad: idNovedad },
+      data: { id_estado_novedad: nuevoEstadoId },
+    });
+
+    // Registrar historial
+    await this.prisma.historial_novedad.create({
+      data: {
+        id_novedad: idNovedad,
+        id_estado_novedad: nuevoEstadoId,
+        id_usuario_modificacion: idUsuario,
+        comentario: 'Cambiado a EN GESTIÓN desde el botón de nómina',
+      },
+    });
+
+    return { success: true, message: 'Estado actualizado correctamente' };
+  }
+
+  async obtenerTodasNovedadesParaNomina(filtros: FiltrosParaNomina) {
+    return this.prisma.novedad.findMany({
+      where: {
+        ...(filtros.tienda && {
+          usuario: {
+            usuario_tienda: {
+              some: {
+                tienda: {
+                  nombre_tienda: {
+                    contains: filtros.tienda,
+                    mode: 'insensitive',
+                  },
+                },
+              },
+            },
+          },
+        }),
+        ...(filtros.tipo && {
+          tipo_novedad: {
+            nombre_tipo: {
+              contains: filtros.tipo,
+              mode: 'insensitive',
+            },
+          },
+        }),
+        ...(filtros.fecha && {
+          fecha_creacion: filtros.fecha,
+        }),
+        // ❌ ¡OJO! NO pongas filtro por estado acá
+      },
+      include: {
+        estado_novedad: true,
+        tipo_novedad: true,
+        usuario: {
+          include: {
+            usuario_tienda: {
+              include: {
+                tienda: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        fecha_creacion: 'desc',
+      },
+    });
+  }
 }
