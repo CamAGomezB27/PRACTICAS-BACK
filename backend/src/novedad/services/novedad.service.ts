@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma.service';
 
 interface FiltrosTienda {
@@ -238,5 +239,76 @@ export class NovedadeService {
     );
 
     return resultados;
+  }
+
+  async obtenerTodasNovedadesFiltradas(filtros: {
+    tienda?: string;
+    tipo?: string;
+    desde?: string;
+    hasta?: string;
+  }) {
+    const where: Prisma.novedadWhereInput = {
+      ...(filtros.tienda && {
+        usuario: {
+          usuario_tienda: {
+            some: {
+              tienda: {
+                nombre_tienda: filtros.tienda,
+              },
+            },
+          },
+        },
+      }),
+
+      ...(filtros.tipo && {
+        tipo_novedad: {
+          nombre_tipo: {
+            contains: filtros.tipo,
+            mode: 'insensitive',
+          },
+        },
+      }),
+
+      ...(filtros.desde || filtros.hasta
+        ? {
+            fecha_creacion: {
+              ...(filtros.desde && { gte: new Date(filtros.desde) }),
+              ...(filtros.hasta && { lte: new Date(filtros.hasta) }),
+            },
+          }
+        : {}),
+    };
+
+    return this.prisma.novedad.findMany({
+      where,
+      orderBy: {
+        fecha_creacion: 'desc',
+      },
+      include: {
+        estado_novedad: {
+          select: {
+            nombre_estado: true,
+          },
+        },
+        tipo_novedad: {
+          select: {
+            nombre_tipo: true,
+          },
+        },
+        usuario: {
+          select: {
+            usuario_tienda: {
+              select: {
+                tienda: {
+                  select: {
+                    nombre_tienda: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
   }
 }

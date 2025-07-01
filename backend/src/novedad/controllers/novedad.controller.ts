@@ -1,16 +1,16 @@
 import {
+  Body,
   Controller,
   Get,
+  Param,
   Post,
-  Body,
+  Query,
   Req,
   UseGuards,
-  Param,
-  Query,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
 import { NovedadeService } from '../services/novedad.service';
-import { AuthGuard } from '@nestjs/passport';
 
 interface JwtPayload {
   id_usuario: number;
@@ -87,5 +87,20 @@ export class NovedadController {
       id_usuario,
       filtros,
     );
+  }
+
+  @Get('todas')
+  async obtenerTodasLasNovedades(
+    @Query('tienda') tienda?: string,
+    @Query('tipo') tipo?: string,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+  ) {
+    return this.novedadService.obtenerTodasNovedadesFiltradas({
+      tienda,
+      tipo,
+      desde,
+      hasta,
+    });
   }
 }
