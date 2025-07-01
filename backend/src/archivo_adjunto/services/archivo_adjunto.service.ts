@@ -52,6 +52,37 @@ export interface ResultadoValidacion {
   cantidadSolicitudes?: number;
 }
 
+interface FilaParaExportar {
+  id: number;
+  numero: number;
+  fecha: string;
+  cedula: string;
+  nombre: string;
+  categoria: string;
+  tienda: string;
+  jefe: string;
+  detalle: string;
+  jornadaEmAc: string;
+  jornadaOtrSiTem: string;
+  fechainicio: string;
+  fechafin: string;
+  salarioActual: number;
+  salarioOtroSiTemp: number;
+  consForms: string;
+  concepto: string;
+  codigo: number;
+  unidades: number;
+  fechaNove: string;
+  fechInicioDisfrute: string;
+  fechaFinDisfrute: string;
+  ResponsableValidacion: string;
+  RespuestaValidacion: string;
+  ajuste: string;
+  Fechapago: string;
+  AreaRespon: string;
+  CategInconsitencia: string;
+}
+
 @Injectable()
 export class ArchivoAdjuntoService {
   constructor(private readonly prisma: PrismaService) {}
@@ -758,5 +789,64 @@ export class ArchivoAdjuntoService {
         fecha_pago: s.fecha_pago,
       };
     });
+  }
+
+  async generarDesdeVistaPrevia(filas: FilaParaExportar[]): Promise<Buffer> {
+    const plantillaPath = path.join(
+      __dirname.includes('dist')
+        ? path.resolve(__dirname, '..', '..', '..', 'assets', 'templates')
+        : path.resolve(__dirname, '..', '..', 'assets', 'templates'),
+      'Consolidado_PostNomina_Cierre.xlsx',
+    );
+
+    const buf = await fs.readFile(plantillaPath);
+    const workbook = new Workbook();
+    await workbook.xlsx.load(buf);
+    const sheet = workbook.getWorksheet(1);
+
+    if (!sheet) {
+      throw new Error(
+        '❌ No se pudo cargar la hoja de cálculo desde la plantilla',
+      );
+    }
+
+    const filaInicio = 7;
+
+    filas.forEach((fila, idx) => {
+      const row = sheet.getRow(filaInicio + idx);
+      row.getCell('A').value = fila.id;
+      row.getCell('B').value = fila.numero;
+      row.getCell('C').value = fila.fecha;
+      row.getCell('D').value = fila.cedula;
+      row.getCell('E').value = fila.nombre;
+      row.getCell('F').value = fila.categoria;
+      row.getCell('G').value = fila.tienda;
+      row.getCell('H').value = fila.jefe;
+      row.getCell('I').value = fila.detalle;
+      row.getCell('J').value = fila.jornadaEmAc;
+      row.getCell('K').value = fila.jornadaOtrSiTem;
+      row.getCell('L').value = fila.fechainicio;
+      row.getCell('M').value = fila.fechafin;
+      row.getCell('N').value = fila.salarioActual;
+      row.getCell('O').value = fila.salarioOtroSiTemp;
+      row.getCell('P').value = fila.consForms;
+      row.getCell('Q').value = fila.concepto;
+      row.getCell('R').value = fila.codigo;
+      row.getCell('S').value = fila.unidades;
+      row.getCell('T').value = fila.fechaNove;
+      row.getCell('U').value = fila.fechInicioDisfrute;
+      row.getCell('V').value = fila.fechaFinDisfrute;
+      row.getCell('W').value = fila.ResponsableValidacion;
+      row.getCell('X').value = fila.RespuestaValidacion;
+      row.getCell('Y').value = fila.ajuste;
+      row.getCell('Z').value = fila.Fechapago;
+      row.getCell('AA').value = fila.AreaRespon;
+      row.getCell('AB').value = fila.CategInconsitencia;
+
+      row.commit();
+    });
+
+    const finalBuffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(finalBuffer);
   }
 }

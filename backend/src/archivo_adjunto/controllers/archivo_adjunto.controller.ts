@@ -46,6 +46,37 @@ interface ResultadoValidacion {
   cantidadSolicitudes?: number;
 }
 
+interface FilaParaExportar {
+  id: number;
+  numero: number;
+  fecha: string;
+  cedula: string;
+  nombre: string;
+  categoria: string;
+  tienda: string;
+  jefe: string;
+  detalle: string;
+  jornadaEmAc: string;
+  jornadaOtrSiTem: string;
+  fechainicio: string;
+  fechafin: string;
+  salarioActual: number;
+  salarioOtroSiTemp: number;
+  consForms: string;
+  concepto: string;
+  codigo: number;
+  unidades: number;
+  fechaNove: string;
+  fechInicioDisfrute: string;
+  fechaFinDisfrute: string;
+  ResponsableValidacion: string;
+  RespuestaValidacion: string;
+  ajuste: string;
+  Fechapago: string;
+  AreaRespon: string;
+  CategInconsitencia: string;
+}
+
 @Controller('archivo-adjunto')
 export class ArchivoAdjuntoController {
   constructor(
@@ -266,6 +297,55 @@ export class ArchivoAdjuntoController {
       console.error('❌ Error al generar Excel desde datos enviados:', error);
       return res.status(500).json({
         message: 'Error al generar archivo desde los datos proporcionados',
+        error: error instanceof Error ? error.stack : String(error),
+      });
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('exportar-archivo-respuesta')
+  async exportarDesdeVistaPrevia(
+    @Body() datos: FilaParaExportar[],
+    @Res() res: Response,
+  ) {
+    try {
+      if (!datos || datos.length === 0) {
+        return res.status(400).json({ message: 'No hay datos para exportar.' });
+      }
+
+      const buffer =
+        await this.archivoAdjuntoService.generarDesdeVistaPrevia(datos);
+
+      // datos para el nombre del archivo
+      const primera = datos[0];
+      const fechaFormateada = primera.fecha
+        ? new Date(primera.fecha)
+            .toLocaleDateString('es-CO', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+            })
+            .replace(/\//g, '-')
+        : 'fecha-desconocida';
+
+      const filename = `Respuesta_Solicitud_${primera.id ?? 'ID'}_${primera.concepto ?? 'Concepto'}_${primera.tienda ?? 'Tienda'}_${fechaFormateada}.xlsx`;
+
+      // Headers
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${filename}"`,
+      );
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+
+      res.send(buffer);
+    } catch (error) {
+      console.error('❌ Error al exportar desde tabla:', error);
+      return res.status(500).json({
+        message: 'Error al generar Excel desde la vista previa',
         error: error instanceof Error ? error.stack : String(error),
       });
     }
