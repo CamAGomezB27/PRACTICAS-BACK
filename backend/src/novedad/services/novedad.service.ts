@@ -9,6 +9,15 @@ interface FiltrosTienda {
   };
 }
 
+interface FiltrosParaNomina {
+  tienda?: string;
+  tipo?: string;
+  fecha?: {
+    gte?: Date;
+    lte?: Date;
+  };
+}
+
 @Injectable()
 export class NovedadeService {
   constructor(private prisma: PrismaService) {}
@@ -270,5 +279,111 @@ export class NovedadeService {
     );
 
     return resultados;
+  }
+
+  async obtenerNovedadesPendientesParaNomina(filtros: FiltrosParaNomina = {}) {
+    const whereCondition: Record<string, any> = {
+      estado_novedad: {
+        nombre_estado: 'CREADA',
+      },
+    };
+
+    // Filtro por tipo
+    if (filtros.tipo) {
+      whereCondition.tipo_novedad = {
+        nombre_tipo: {
+          equals: filtros.tipo,
+          mode: 'insensitive',
+        },
+      };
+    }
+
+    // Filtro por tienda
+    if (filtros.tienda) {
+      whereCondition.usuario = {
+        usuario_tienda: {
+          some: {
+            tienda: {
+              nombre_tienda: {
+                equals: filtros.tienda,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+      };
+    }
+
+    // ✅ Filtro por fecha de creación
+    if (filtros.fecha) {
+      const fechaFiltro: { gte?: Date; lte?: Date } = {};
+
+      if (filtros.fecha.gte) {
+        const gte = new Date(filtros.fecha.gte);
+        fechaFiltro.gte = new Date(
+          gte.getFullYear(),
+          gte.getMonth(),
+          gte.getDate(),
+          0,
+          0,
+          0,
+          0,
+        );
+      }
+
+      if (filtros.fecha.lte) {
+        const lte = new Date(filtros.fecha.lte);
+        fechaFiltro.lte = new Date(
+          lte.getFullYear(),
+          lte.getMonth(),
+          lte.getDate(),
+          23,
+          59,
+          59,
+          999,
+        );
+      }
+
+      if (fechaFiltro.gte || fechaFiltro.lte) {
+        whereCondition.fecha_creacion = fechaFiltro;
+      }
+    }
+
+    return this.prisma.novedad.findMany({
+      where: whereCondition,
+      orderBy: {
+        fecha_creacion: 'desc',
+      },
+      select: {
+        id_novedad: true,
+        descripcion: true,
+        fecha_creacion: true,
+        es_masiva: true,
+        cantidad_solicitudes: true,
+        estado_novedad: {
+          select: {
+            nombre_estado: true,
+          },
+        },
+        tipo_novedad: {
+          select: {
+            nombre_tipo: true,
+          },
+        },
+        usuario: {
+          select: {
+            usuario_tienda: {
+              select: {
+                tienda: {
+                  select: {
+                    nombre_tienda: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
   }
 }

@@ -25,6 +25,15 @@ interface FiltrosTienda {
   };
 }
 
+interface FiltrosParaNomina {
+  tienda?: string;
+  tipo?: string;
+  fecha?: {
+    gte?: Date;
+    lte?: Date;
+  };
+}
+
 @Controller('novedad')
 @UseGuards(AuthGuard('jwt'))
 export class NovedadController {
@@ -105,5 +114,44 @@ export class NovedadController {
       id_usuario,
       filtros,
     );
+  }
+
+  @Get('todas')
+  async obtenerTodasPendientes(
+    @Query('tienda') tienda?: string,
+    @Query('tipo') tipo?: string,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+  ) {
+    const filtros: FiltrosParaNomina = {};
+
+    if (tienda) filtros.tienda = tienda;
+    if (tipo) filtros.tipo = tipo;
+
+    if (desde || hasta) {
+      const gte = desde ? new Date(desde) : undefined;
+      const lte = hasta ? new Date(hasta) : undefined;
+
+      if (gte && !isNaN(gte.getTime())) {
+        filtros.fecha = { ...filtros.fecha, gte };
+      }
+
+      if (lte && !isNaN(lte.getTime())) {
+        filtros.fecha = {
+          ...filtros.fecha,
+          lte: new Date(
+            lte.getFullYear(),
+            lte.getMonth(),
+            lte.getDate(),
+            23,
+            59,
+            59,
+            999,
+          ),
+        };
+      }
+    }
+
+    return this.novedadService.obtenerNovedadesPendientesParaNomina(filtros);
   }
 }
