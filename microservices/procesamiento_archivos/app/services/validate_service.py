@@ -3,6 +3,8 @@ import openpyxl
 from io import BytesIO
 from datetime import datetime
 
+import openpyxl.utils
+
 TIPOS_PERMITIDOS = {
     "Auxilio de transporte": "SOLICITUDES.xlsx",
     "Otros": "SOLICITUDES.xlsx",
@@ -102,6 +104,23 @@ async def validar_excel(
             "valido": False,
             "errores": errores
         }
+        
+    #VALIDACIONES EXTRA
+    
+    #1.Datos fuera del rango
+    max_col_permitida = len(cabeceras_esperadas)
+    
+    for row_idx in range(6, sheet.max_row +1):
+        fila = sheet[row_idx]
+        for col_idx in range(max_col_permitida, sheet.max_column): #Columnas fuera de rango
+            if col_idx >= len(fila):
+                continue
+            valor_extra = fila[col_idx].value
+            if valor_extra is not None and str(valor_extra).strip() != "":
+                letra_col = openpyxl.utils.get_column_letter(col_idx + 1)
+                errores.append(
+                     f"❌ Fila {row_idx}, columna {letra_col}: No debe contener información. Solo se permiten columnas hasta la {openpyxl.utils.get_column_letter(max_col_permitida)}."
+                )
 
     # Construir los campos obligatorios para verificación de contenido 
     campos_obligatorios = {}
@@ -120,6 +139,9 @@ async def validar_excel(
                 "valido": False,
                 "errores": errores
             }
+
+    #SET CONTROL DE DUPLICADOS EN LA MISMA PLANTILLA
+    duplicados_cedula_fecha = set()
 
     # Recorrer las filas
     for row_idx in range(6, sheet.max_row + 1):
@@ -176,6 +198,32 @@ async def validar_excel(
         # G: Jefe
         if str(cell_G.value).strip() != nombreUsuario.strip():
             errores.append(f"❌ Fila {row_idx}, columna G: Se esperaba el nombre del jefe '{nombreUsuario}' y llegó '{cell_G.value}'")
+        
+        #VALIDACIONES EXTRA
+        
+        #2.No puede estar la misma persona el mismo día en la misma solicitud
+        cedula_idx = campos_obligatorios.get("CEDULA")
+        fecha_idx = 1 # COLUMNA B --> FECHA
+        
+        cedula_val = str(fila[cedula_idx].value).strip() if cedula_idx is not None else ""
+        fecha_val = fila[fecha_idx].value
+        
+        if isinstance(fecha_val, datetime):
+            fecha_val = fecha_val.date()
+        elif isinstance(fecha_val, str):
+            try:
+                fecha_val = datetime.strptime(fecha_val, "%d/%m/%Y").date()
+            except Exception:
+                fecha_val = None
+        
+        clave = f"{cedula_val}-{fecha_val}"
+        
+        if clave in duplicados_cedula_fecha:
+            errores.append(
+                f"❌ Fila {row_idx}: La persona con cédula {cedula_val} ya tiene una solicitud registrada el día {fecha_val}."
+            )
+            fila_valida = False
+        else: duplicados_cedula_fecha.add(clave)
 
         if fila_valida:
             print(f"✅ Fila {row_idx} completa y válida.")
