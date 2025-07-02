@@ -849,4 +849,101 @@ export class ArchivoAdjuntoService {
     const finalBuffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(finalBuffer);
   }
+
+  async procesarArchivoRespuestas(
+    fileBuffer: Buffer,
+  ): Promise<{ actualizados: number }> {
+    const workbook = new Workbook();
+    await workbook.xlsx.load(fileBuffer);
+    const sheet = workbook.getWorksheet(1);
+
+    if (!sheet) {
+      throw new Error('❌ No se pudo leer la hoja del Excel');
+    }
+
+    let actualizados = 0;
+    const idsActualizados = new Set<number>();
+
+    for (let rowIndex = 7; rowIndex <= sheet.rowCount; rowIndex++) {
+      const row = sheet.getRow(rowIndex);
+      const idNovedad = row.getCell('A').value as number;
+      const n = row.getCell('B').value as number;
+
+      if (
+        !idNovedad ||
+        !n ||
+        typeof idNovedad !== 'number' ||
+        typeof n !== 'number'
+      )
+        continue;
+
+      const detalle = await this.prisma.detalleNovedadMasiva.findFirst({
+        where: {
+          id_novedad: idNovedad,
+          n: n,
+          novedad: {
+            id_estado_novedad: 2, // solo procesamos EN GESTIÓN
+          },
+        },
+        include: {
+          novedad: true,
+        },
+      });
+
+      if (!detalle) continue;
+
+      // Obtener celdas
+      const respuestaValidacion = this.getCellValue(row, 'X');
+      const ajuste = this.getCellValue(row, 'Y');
+      const fechaPagoRaw = row.getCell('Z').value;
+      const areaResponsable = this.getCellValue(row, 'AA');
+      const categoriaInconsistencia = this.getCellValue(row, 'AB');
+
+      const fecha_pago =
+        fechaPagoRaw instanceof Date
+          ? fechaPagoRaw
+          : typeof fechaPagoRaw === 'string' && fechaPagoRaw.trim()
+            ? new Date(fechaPagoRaw)
+            : undefined;
+
+      // Actualizar detalle
+      await this.prisma.detalleNovedadMasiva.update({
+        where: { id_detalle: detalle.id_detalle },
+        data: {
+          respuesta_validacion: respuestaValidacion,
+          ajuste,
+          fecha_pago,
+          area_responsable: areaResponsable,
+          categoria_inconsistencia: categoriaInconsistencia,
+        },
+      });
+
+      actualizados++;
+
+      // Marcar novedad para futura actualización de estado
+      idsActualizados.add(idNovedad);
+    }
+
+    // Actualizar estado de todas las novedades cuyos detalles fueron tocados
+    for (const id of idsActualizados) {
+      const detalles = await this.prisma.detalleNovedadMasiva.findMany({
+        where: { id_novedad: id },
+      });
+
+      const todosActualizados = detalles.every(
+        (d) =>
+          d.respuesta_validacion !== null &&
+          d.respuesta_validacion !== undefined,
+      );
+
+      if (todosActualizados) {
+        await this.prisma.novedad.update({
+          where: { id_novedad: id },
+          data: { id_estado_novedad: 3 }, // GESTIONADA
+        });
+      }
+    }
+
+    return { actualizados };
+  }
 }

@@ -413,4 +413,11 @@ export class ArchivoAdjuntoController {
       });
     }
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('cargar-respuesta-masiva')
+  @UseInterceptors(FileInterceptor('file'))
+  async cargarRespuestaMasiva(@UploadedFile() file: Express.Multer.File) {
+    return this.archivoAdjuntoService.procesarArchivoRespuestas(file.buffer);
+  }
 }
