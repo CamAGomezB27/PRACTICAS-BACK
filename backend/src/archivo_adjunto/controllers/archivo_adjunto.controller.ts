@@ -365,13 +365,13 @@ export class ArchivoAdjuntoController {
       const categorias = Array.from(
         new Set(
           datos
-            .map((d) => d.detalle || d.concepto || '')
+            .map((d) => d.categoria || '')
             .filter((cat) => cat.trim() !== '')
             .map((cat) =>
               cat
-                .normalize('NFD') // quita tildes
+                .normalize('NFD')
                 .replace(/[\u0300-\u036f]/g, '')
-                .replace(/\s+/g, '_') // espacios a guiones bajos
+                .replace(/\s+/g, '_')
                 .toUpperCase(),
             ),
         ),

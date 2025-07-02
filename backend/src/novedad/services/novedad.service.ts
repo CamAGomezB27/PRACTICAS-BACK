@@ -639,4 +639,17 @@ export class NovedadeService {
       },
     });
   }
+
+  async cambiarMultiplesEstados(idsNovedades: number[], nuevoEstadoId: number) {
+    return this.prisma.novedad.updateMany({
+      where: {
+        id_novedad: {
+          in: idsNovedades,
+        },
+      },
+      data: {
+        id_estado_novedad: nuevoEstadoId,
+      },
+    });
+  }
 }

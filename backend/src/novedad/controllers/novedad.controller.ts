@@ -217,22 +217,6 @@ export class NovedadController {
     return this.novedadService.obtenerDetallesParaConsolidado(filtros);
   }
 
-  @Put(':id/cambiar-estado')
-  async cambiarEstado(
-    @Param('id') id: string,
-    @Body() body: { nuevoEstadoId: number },
-    @Req() req: Request,
-  ) {
-    const { id_usuario } = req.user as JwtPayload;
-    const idNovedad = parseInt(id, 10);
-
-    return this.novedadService.cambiarEstadoNovedad(
-      idNovedad,
-      body.nuevoEstadoId,
-      id_usuario,
-    );
-  }
-
   @Get('consolidado-pendientes-nomina')
   async obtenerNovedadesPendientes(
     @Query('tienda') tienda: string,
@@ -252,5 +236,35 @@ export class NovedadController {
     }
 
     return this.novedadService.obtenerDetallesPendientesParaNomina(filtros);
+  }
+
+  @Put(':id/cambiar-estado')
+  async cambiarEstado(
+    @Param('id') id: string,
+    @Body() body: { nuevoEstadoId: number },
+    @Req() req: Request,
+  ) {
+    const { id_usuario } = req.user as JwtPayload;
+    const idNovedad = parseInt(id, 10);
+
+    return this.novedadService.cambiarEstadoNovedad(
+      idNovedad,
+      body.nuevoEstadoId,
+      id_usuario,
+    );
+  }
+
+  @Put('cambiar-estados-respuesta-masiva')
+  async cambiarEstadosMasivo(
+    @Body()
+    body: {
+      idsNovedades: number[];
+      nuevoEstadoId: number;
+    },
+  ) {
+    return this.novedadService.cambiarMultiplesEstados(
+      body.idsNovedades,
+      body.nuevoEstadoId,
+    );
   }
 }
