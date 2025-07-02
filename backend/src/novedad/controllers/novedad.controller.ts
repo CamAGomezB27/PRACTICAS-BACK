@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
+import { getMensajePorEstadoBackend } from 'src/utils/getMensajePorEstado';
 import { NovedadeService } from '../services/novedad.service';
 
 interface JwtPayload {
@@ -244,13 +245,26 @@ export class NovedadController {
     @Body() body: { nuevoEstadoId: number },
     @Req() req: Request,
   ) {
-    const { id_usuario } = req.user as JwtPayload;
+    const { id_usuario, esJefe } = req.user as JwtPayload;
     const idNovedad = parseInt(id, 10);
+
+    // Mapear ID de estado a string
+    const estadoMap: Record<number, string> = {
+      1: 'CREADA',
+      2: 'EN GESTIÓN',
+      3: 'GESTIONADA',
+    };
+
+    const estadoStr = estadoMap[body.nuevoEstadoId] ?? 'DESCONOCIDO';
+
+    // Generar mensaje dinámico según rol y estado
+    const descripcion = getMensajePorEstadoBackend(estadoStr, !esJefe); // es tienda si no es jefe
 
     return this.novedadService.cambiarEstadoNovedad(
       idNovedad,
       body.nuevoEstadoId,
       id_usuario,
+      descripcion,
     );
   }
 
@@ -261,10 +275,14 @@ export class NovedadController {
       idsNovedades: number[];
       nuevoEstadoId: number;
     },
+    @Req() req: Request,
   ) {
+    const { id_usuario, esJefe } = req.user as JwtPayload;
     return this.novedadService.cambiarMultiplesEstados(
       body.idsNovedades,
       body.nuevoEstadoId,
+      id_usuario,
+      !esJefe, // esTienda
     );
   }
 }

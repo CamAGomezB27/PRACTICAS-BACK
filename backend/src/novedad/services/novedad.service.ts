@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
+import { getMensajePorEstadoBackend } from 'src/utils/getMensajePorEstado';
 
 interface FiltrosTienda {
   tipo?: string;
@@ -477,20 +478,32 @@ export class NovedadeService {
     idNovedad: number,
     nuevoEstadoId: number,
     idUsuario: number,
+    descripcion: string,
   ) {
-    // Cambiar estado en la novedad
+    const estadoMap: Record<number, string> = {
+      1: 'CREADA',
+      2: 'EN GESTIÓN',
+      3: 'GESTIONADA',
+    };
+
+    const estadoStr = estadoMap[nuevoEstadoId] ?? 'DESCONOCIDO';
+
     await this.prisma.novedad.update({
       where: { id_novedad: idNovedad },
-      data: { id_estado_novedad: nuevoEstadoId },
+      data: {
+        id_estado_novedad: nuevoEstadoId,
+        descripcion,
+      },
     });
 
-    // Registrar historial
     await this.prisma.historial_novedad.create({
       data: {
         id_novedad: idNovedad,
         id_estado_novedad: nuevoEstadoId,
         id_usuario_modificacion: idUsuario,
-        comentario: 'Cambiado a EN GESTIÓN desde el botón de nómina',
+        comentario: `Estado cambiado a "${estadoStr}" por ${
+          descripcion.includes('TIENDA') ? 'TIENDA' : 'NÓMINA'
+        }`,
       },
     });
 
@@ -640,16 +653,46 @@ export class NovedadeService {
     });
   }
 
-  async cambiarMultiplesEstados(idsNovedades: number[], nuevoEstadoId: number) {
-    return this.prisma.novedad.updateMany({
-      where: {
-        id_novedad: {
-          in: idsNovedades,
+  async cambiarMultiplesEstados(
+    idsNovedades: number[],
+    nuevoEstadoId: number,
+    idUsuario: number,
+    esTienda: boolean,
+  ) {
+    const estadoMap: Record<number, string> = {
+      1: 'CREADA',
+      2: 'EN GESTIÓN',
+      3: 'GESTIONADA',
+    };
+
+    const estadoStr = estadoMap[nuevoEstadoId] ?? 'DESCONOCIDO';
+
+    for (const id of idsNovedades) {
+      const nuevaDescripcion = getMensajePorEstadoBackend(estadoStr, esTienda);
+
+      // Cambiar estado + descripción
+      await this.prisma.novedad.update({
+        where: { id_novedad: id },
+        data: {
+          id_estado_novedad: nuevoEstadoId,
+          descripcion: nuevaDescripcion,
         },
-      },
-      data: {
-        id_estado_novedad: nuevoEstadoId,
-      },
-    });
+      });
+
+      // Registrar historial
+      await this.prisma.historial_novedad.create({
+        data: {
+          id_novedad: id,
+          id_estado_novedad: nuevoEstadoId,
+          id_usuario_modificacion: idUsuario,
+          comentario: `Estado cambiado a "${estadoStr}" por ${esTienda ? 'TIENDA' : 'NÓMINA'}`,
+        },
+      });
+    }
+
+    return {
+      success: true,
+      message: `Se actualizaron ${idsNovedades.length} novedades correctamente.`,
+    };
   }
 }

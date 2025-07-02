@@ -15,6 +15,7 @@ import { Request, Response } from 'express';
 import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { NovedadeService } from 'src/novedad/services/novedad.service';
+import { getMensajePorEstadoBackend } from 'src/utils/getMensajePorEstado';
 import {
   ArchivoAdjuntoService,
   SolicitudConIdDetalle,
@@ -46,6 +47,7 @@ interface ResultadoValidacion {
   cantidadSolicitudes?: number;
 }
 
+//Filas en archivo de exportación
 interface FilaParaExportar {
   id: number;
   numero: number;
@@ -206,9 +208,11 @@ export class ArchivoAdjuntoController {
 
       const idTipoNovedad = mapaTiposNovedad[titulo] ?? null;
 
+      const mensaje = getMensajePorEstadoBackend('CREADA', !req.user.esJefe); // true si es tienda
+
       const novedad = await this.novedadService.crearNovedad({
         idUsuario: req.user.id_usuario,
-        descripcion: `✅ Archivo cargado. En espera de validación por Nómina.`,
+        descripcion: mensaje,
         idEstado: 1,
         idTipoNovedad,
         esMasiva: true,
