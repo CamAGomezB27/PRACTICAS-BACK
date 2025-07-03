@@ -166,6 +166,36 @@ async def validar_excel(
                 fila_valida = False
             else:
                 print(f"✅ Fila {row_idx}, Columna {col_idx + 1} ({campo}): OK → '{valor}'")
+            
+                #VALIDACIONES EXTRA
+                
+                #3.LONGITUD DE MENSAJE EN DETALLE NOVEDAD
+                if campo == "DETALLE NOVEDAD":
+                    texto = str(valor).strip()
+                    longitud = len (texto)
+                    if longitud < 15 or longitud > 125:
+                        errores.append(
+                            f"❌ Fila {row_idx}, Columna {col_idx + 1} (DETALLE NOVEDAD): debe tener entre 15 y 125 caracteres. Tiene {longitud}."
+                        )
+                        fila_valida = False
+                
+                #4. SIN CARACTERES RAROS (# $ @ . ! ¡ ¿ ? .) EN NOMBRE
+                if campo == "NOMBRE (APELLIDOS-NOMBRES)":
+                    texto = str(valor).strip()
+                    if not all(char.isalpha() or char.isspace() or char in "áéíóúÁÉÍÓÚñÑ" for char in texto):
+                        errores.append(
+                            f"❌ Fila {row_idx}, Columna {col_idx + 1} (NOMBRE): contiene caracteres inválidos. Solo se permiten letras, tildes y espacios."
+                        )
+                        fila_valida = False
+                
+                #5. CAMPO CEDULA SOLO NUMEROS
+                if campo == "CEDULA":
+                    texto = str(valor).strip()
+                    if not texto.isdigit():
+                        errores.append(
+                            f"❌ Fila {row_idx}, Columna {col_idx + 1} (CÉDULA): debe contener solo números. Valor recibido: '{texto}'."
+                        )
+                        fila_valida = False
 
         # Validaciones automáticas por columnas generadas (solo si hay fila visible)
         cell_A = fila[0]  # Columna A
