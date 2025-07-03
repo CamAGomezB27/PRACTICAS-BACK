@@ -15,7 +15,7 @@ import { Request, Response } from 'express';
 import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { NovedadeService } from 'src/novedad/services/novedad.service';
-import { getMensajePorEstadoBackend } from 'src/utils/getMensajePorEstado';
+import { getMensajePorEstadoBackendPorId } from 'src/utils/getMensajePorEstado';
 import {
   ArchivoAdjuntoService,
   SolicitudConIdDetalle,
@@ -211,7 +211,7 @@ export class ArchivoAdjuntoController {
 
       const idTipoNovedad = mapaTiposNovedad[titulo] ?? null;
 
-      const mensaje = getMensajePorEstadoBackend('CREADA', !req.user.esJefe); // true si es tienda
+      const mensaje = getMensajePorEstadoBackendPorId(1, req.user.esJefe);
 
       const novedad = await this.novedadService.crearNovedad({
         idUsuario: req.user.id_usuario,

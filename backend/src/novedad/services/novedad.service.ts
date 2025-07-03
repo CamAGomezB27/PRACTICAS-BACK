@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma.service';
-import { getMensajePorEstadoBackend } from 'src/utils/getMensajePorEstado';
+import { getMensajePorEstadoBackendPorId } from 'src/utils/getMensajePorEstado';
 
 interface FiltrosTienda {
   tipo?: string;
@@ -681,7 +681,10 @@ export class NovedadeService {
     const estadoStr = estadoMap[nuevoEstadoId] ?? 'DESCONOCIDO';
 
     for (const id of idsNovedades) {
-      const nuevaDescripcion = getMensajePorEstadoBackend(estadoStr, esTienda);
+      const nuevaDescripcion = getMensajePorEstadoBackendPorId(
+        nuevoEstadoId,
+        !esTienda,
+      );
 
       // Cambiar estado + descripción
       await this.prisma.novedad.update({
