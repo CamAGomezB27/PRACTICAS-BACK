@@ -2,7 +2,7 @@ from fastapi import UploadFile, Form
 import openpyxl
 from io import BytesIO
 from datetime import datetime
-
+import requests
 import openpyxl.utils
 
 TIPOS_PERMITIDOS = {
@@ -21,6 +21,24 @@ async def validar_excel(
     nombreUsuario: str = Form(...),
     nombreTienda: str = Form(...)
 ):
+    
+    def validar_duplicado_en_backend(cedula, fecha, tipo, detalle):
+        url = "http://localhost:3000/novedad/validar-duplicado"
+        params = {
+            "cedula": cedula,
+            "fecha": fecha,
+            "tipo": tipo,
+            "detalle": detalle
+        }
+        try :
+            response = requests.get(url, params=params, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("existe", False), data.get("mensaje", "")
+            else:
+                return False, f"⚠️ Error al consultar duplicado: código {response.status_code}"
+        except Exception as e:
+            return False, f"⚠️ Excepción al validar duplicado: {e}"
     
     print(f"📥 Archivo recibido: {file.filename}")
     print(f"📋 Tipo: {tipo}, Título: {titulo}, Usuario: {nombreUsuario}, Tienda: {nombreTienda}")
@@ -254,7 +272,22 @@ async def validar_excel(
             )
             fila_valida = False
         else: duplicados_cedula_fecha.add(clave)
+        
+        #VALIDAR DUPLICADOS EN BD DESDE EN BACKEND
+        detalle_idx = campos_obligatorios.get("DETALLE NOVEDAD")
+        detalle_val = str(fila[detalle_idx].value).strip() if detalle_idx is not None else ""
+        
+        print(f"🔄 Verificando duplicado en BD: {cedula_val} | {fecha_val} | {tipo} | {detalle_val}")
 
+        
+        existe_en_bd, mensaje_duplicado = validar_duplicado_en_backend(
+            cedula_val, fecha_val.strftime("%Y-%m-%d") if isinstance(fecha_val, datetime) else str(fecha_val), tipo, detalle_val
+        )
+        
+        if existe_en_bd:
+            errores.append(f"❌ Fila {row_idx}: novedad duplicada en base de datos – {mensaje_duplicado}")
+            fila_valida = False  
+            
         if fila_valida:
             print(f"✅ Fila {row_idx} completa y válida.")
             cantidad_solicitudes += 1
