@@ -175,6 +175,8 @@ export class ArchivoAdjuntoController {
         };
       }
 
+      const jwtToken =
+        typeof req.cookies?.jwt === 'string' ? req.cookies.jwt : '';
       const validacion: ResultadoValidacion =
         await this.archivoAdjuntoService.validarArchivoBufferConMicroservicio(
           archivo.buffer,
@@ -182,6 +184,7 @@ export class ArchivoAdjuntoController {
           titulo,
           req.user.nombre,
           req.user.nombreTienda,
+          jwtToken,
         );
 
       console.log('🧪 Resultado de validación:', validacion);

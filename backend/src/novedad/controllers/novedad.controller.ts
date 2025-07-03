@@ -291,13 +291,34 @@ export class NovedadController {
     @Query('cedula') cedula: string,
     @Query('fecha') fecha: string,
     @Query('tipo') tipo: string,
-    @Query('detalle') detalle: string,
   ) {
-    return this.novedadService.validarDuplicado({
+    console.log('🔍 [CONTROLLER] Validando duplicado:', {
       cedula,
       fecha,
       tipo,
-      detalle,
     });
+
+    try {
+      const existe = await this.novedadService.existeDuplicadoRobusto({
+        cedula,
+        fecha,
+        tipo,
+      });
+
+      console.log('🔍 [CONTROLLER] Resultado validación:', { existe });
+
+      return {
+        existe,
+        mensaje: existe
+          ? `Ya existe una novedad con cédula ${cedula}, fecha ${fecha} y tipo ${tipo}`
+          : 'No existe duplicado',
+      };
+    } catch (error) {
+      console.error('❌ [CONTROLLER] Error validando duplicado:', error);
+      return {
+        existe: false,
+        mensaje: 'Error al validar duplicado',
+      };
+    }
   }
 }

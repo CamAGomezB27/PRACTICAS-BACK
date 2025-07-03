@@ -150,11 +150,15 @@ export class ArchivoAdjuntoService {
 
         const fechaCell = row.getCell('B');
         const hoy = new Date();
-        const fechaUTC = new Date(
-          Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()),
+        const fechaLocal = new Date(
+          hoy.getFullYear(),
+          hoy.getMonth(),
+          hoy.getDate(),
         );
-        fechaCell.value = fechaUTC;
+        fechaCell.value = fechaLocal;
         fechaCell.numFmt = 'dd/mm/yyyy';
+
+        console.log('📝 Fecha escrita en plantilla:', fechaLocal.toISOString());
 
         row.getCell('E').value = titulo;
         row.getCell('F').value = nombreTienda;
@@ -179,6 +183,7 @@ export class ArchivoAdjuntoService {
     titulo: string,
     nombreUsuario: string,
     nombreTienda: string,
+    jwtToken: string, // <--- nuevo
   ): Promise<ResultadoValidacion> {
     try {
       const form = new FormData();
@@ -196,7 +201,10 @@ export class ArchivoAdjuntoService {
         'http://localhost:8001/validar/',
         form,
         {
-          headers: form.getHeaders(),
+          headers: {
+            ...form.getHeaders(),
+            Authorization: `Bearer ${jwtToken}`, // 🔥 ENVÍAS TOKEN EN EL HEADER
+          },
           timeout: 30000,
         },
       );
@@ -338,6 +346,10 @@ export class ArchivoAdjuntoService {
         skipDuplicates: true, // Evitar duplicados
       });
 
+      for (const fila of filas) {
+        console.log('🧪 Fecha lista para guardar:', fila.fecha);
+      }
+
       console.log(`Se procesaron ${filas.length} filas correctamente`);
     } catch (error: unknown) {
       const errorMessage =
@@ -422,38 +434,43 @@ export class ArchivoAdjuntoService {
   private convertirAFecha(valor: unknown): Date | null {
     if (!valor) return null;
 
-    if (valor instanceof Date) {
-      return isNaN(valor.getTime()) ? null : valor;
-    }
+    try {
+      let fecha: Date;
 
-    if (typeof valor === 'string') {
-      // 👇 Intentamos parsear formato tipo "23/06/2025"
-      const partes = valor.split('/');
-      if (partes.length === 3) {
-        const dia = parseInt(partes[0], 10);
-        const mes = parseInt(partes[1], 10) - 1; // los meses en JS van de 0 a 11
-        const anio = parseInt(partes[2], 10);
-        const fecha = new Date(anio, mes, dia);
-        return isNaN(fecha.getTime()) ? null : fecha;
+      if (valor instanceof Date) {
+        return new Date(valor.getFullYear(), valor.getMonth(), valor.getDate());
       }
 
-      // Fallback: intentar parseo normal
-      const fecha = new Date(valor);
-      return isNaN(fecha.getTime()) ? null : fecha;
-    }
-
-    if (typeof valor === 'number') {
-      // Fechas en formato Excel
-      if (valor > 25000 && valor < 100000) {
-        const fecha = new Date((valor - 25569) * 86400 * 1000);
-        return isNaN(fecha.getTime()) ? null : fecha;
+      if (typeof valor === 'string') {
+        const partes = valor.split('/');
+        if (partes.length === 3) {
+          const dia = parseInt(partes[0], 10);
+          const mes = parseInt(partes[1], 10) - 1;
+          const anio = parseInt(partes[2], 10);
+          return new Date(anio, mes, dia);
+        }
+        fecha = new Date(valor);
+        return new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate());
       }
 
-      const fecha = new Date(valor);
-      return isNaN(fecha.getTime()) ? null : fecha;
-    }
+      if (typeof valor === 'number') {
+        const temp = new Date((valor - 25569) * 86400 * 1000);
+        return new Date(
+          temp.getFullYear(),
+          temp.getMonth(),
+          temp.getDate(),
+          5, // 👈 agregamos 5 horas de compensación para Colombia
+          0,
+          0,
+          0,
+        );
+      }
 
-    return null;
+      return null;
+    } catch (error) {
+      console.error('❌ Error en convertirAFecha:', error);
+      return null;
+    }
   }
 
   private convertirAEntero(valor: unknown): number | null {

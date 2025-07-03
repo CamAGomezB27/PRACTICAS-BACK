@@ -2,8 +2,9 @@ from fastapi import UploadFile, Form
 import openpyxl
 from io import BytesIO
 from datetime import datetime
-import requests
+import httpx
 import openpyxl.utils
+from fastapi import Header
 
 TIPOS_PERMITIDOS = {
     "Auxilio de transporte": "SOLICITUDES.xlsx",
@@ -14,35 +15,71 @@ TIPOS_PERMITIDOS = {
     "Vacaciones": "SOLICITUDES4.xlsx",
 }
 
+def normalizar_fecha(fecha_raw):
+    if isinstance(fecha_raw, datetime):
+        # Forzar hora a las 05:00:00
+        return fecha_raw.replace(hour=5, minute=0, second=0, microsecond=0)
+    elif isinstance(fecha_raw, str):
+        try:
+            fecha = datetime.strptime(fecha_raw.strip(), "%d/%m/%Y")
+            return fecha.replace(hour=5, minute=0, second=0, microsecond=0)
+        except Exception:
+            return None
+    return None
+
+async def validar_duplicado_en_backend(cedula: str, fecha: datetime, tipo: str, nombre: str, jwt_token: str):
+    url = "http://localhost:3000/novedad/validar-duplicado"
+
+    fecha_str = fecha.strftime("%Y-%m-%d %H:%M:%S")
+    params = {
+        "cedula": cedula,
+        "fecha": fecha_str,
+        "tipo": tipo,
+        "nombre": nombre
+    }
+
+    # 👇 Asegura que el token tenga el prefijo "Bearer "
+    if jwt_token and not jwt_token.lower().startswith("bearer "):
+        jwt_token = f"Bearer {jwt_token}"
+
+    headers = {
+        "Authorization": jwt_token
+    }
+
+    print(f"🔍 [MICROSERVICIO] Enviando request a BD: {params}")
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params, headers=headers, timeout=10)
+            print(f"🔍 [MICROSERVICIO] Status code: {response.status_code}")
+            print(f"🔍 [MICROSERVICIO] Response text: {response.text}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                print(f"🔍 [MICROSERVICIO] Response data: {data}")
+                existe = data.get("existe", False)
+                mensaje = data.get("mensaje", "")
+                print(f"🔍 [MICROSERVICIO] ¿Existe duplicado? {existe}")
+                return existe, mensaje
+            else:
+                print(f"❌ [MICROSERVICIO] Error HTTP: {response.status_code}")
+                return False, f"⚠️ Error al consultar duplicado: código {response.status_code}"
+    except Exception as e:
+        print(f"❌ [MICROSERVICIO] Excepción: {e}")
+        return False, f"⚠️ Excepción al validar duplicado: {e}"
+
+
 async def validar_excel(
     file: UploadFile,
     tipo: str,
     titulo: str = Form(...),
     nombreUsuario: str = Form(...),
-    nombreTienda: str = Form(...)
+    nombreTienda: str = Form(...),
+    authorization: str = Header(None), 
 ):
-    
-    def validar_duplicado_en_backend(cedula, fecha, tipo, detalle):
-        url = "http://localhost:3000/novedad/validar-duplicado"
-        params = {
-            "cedula": cedula,
-            "fecha": fecha,
-            "tipo": tipo,
-            "detalle": detalle
-        }
-        try :
-            response = requests.get(url, params=params, timeout=5)
-            if response.status_code == 200:
-                data = response.json()
-                return data.get("existe", False), data.get("mensaje", "")
-            else:
-                return False, f"⚠️ Error al consultar duplicado: código {response.status_code}"
-        except Exception as e:
-            return False, f"⚠️ Excepción al validar duplicado: {e}"
     
     print(f"📥 Archivo recibido: {file.filename}")
     print(f"📋 Tipo: {tipo}, Título: {titulo}, Usuario: {nombreUsuario}, Tienda: {nombreTienda}")
-    
     
     errores = []
     cantidad_solicitudes = 0  # Contador de filas válidas
@@ -151,17 +188,78 @@ async def validar_excel(
         else:
             errores.append(f"❌ Falta la columna obligatoria: {campo}")
 
-        if errores:
-            print("🛑 Errores por campos obligatorios:", errores)
-            return {
-                "valido": False,
-                "errores": errores
-            }
+    if errores:
+        print("🛑 Errores por campos obligatorios:", errores)
+        return {
+            "valido": False,
+            "errores": errores
+        }
 
-    #SET CONTROL DE DUPLICADOS EN LA MISMA PLANTILLA
+    # SET CONTROL DE DUPLICADOS EN LA MISMA PLANTILLA
     duplicados_cedula_fecha = set()
+    
+    # MEJORADO: Validar todos los registros contra la BD al inicio
+    registros_para_validar = []
+    
+    # Primero recopilar todos los registros válidos
+    for row_idx in range(6, sheet.max_row + 1):
+        fila = sheet[row_idx]
+        fila_visible = any(cell.value is not None for cell in fila)
 
-    # Recorrer las filas
+        if not fila_visible:
+            continue
+
+        # Extraer datos principales
+        cedula_idx = campos_obligatorios.get("CEDULA")
+        fecha_idx = 1  # COLUMNA B --> FECHA
+        
+        cedula_val = str(fila[cedula_idx].value).strip() if cedula_idx is not None else ""
+        fecha_val = fila[fecha_idx].value
+        
+        if isinstance(fecha_val, datetime):
+            fecha_val = fecha_val.replace(hour=5, minute=0, second=0, microsecond=0)
+        elif isinstance(fecha_val, str):
+            try:
+                fecha_val = datetime.strptime(fecha_val.strip(), "%d/%m/%Y").replace(hour=5, minute=0, second=0, microsecond=0)
+            except Exception:
+                fecha_val = None
+        
+        if cedula_val and fecha_val:
+            registros_para_validar.append({
+                'row_idx': row_idx,
+                'cedula': cedula_val,
+                'fecha': fecha_val,
+                'tipo': tipo
+            })
+
+    # Validar duplicados en BD de forma masiva
+    print(f"🔍 [MICROSERVICIO] Validando {len(registros_para_validar)} registros contra la BD...")
+    duplicados_bd = set()
+    
+    for registro in registros_para_validar:
+        print(f"🔍 [MICROSERVICIO] Validando registro: {registro}")
+        
+        jwt_token = str(authorization)
+        
+        existe_en_bd, mensaje_duplicado = await validar_duplicado_en_backend(
+            registro['cedula'],
+            registro['fecha'],
+            registro['tipo'],
+            "",  # nombre no es necesario para la validación de duplicados
+            jwt_token 
+        )
+        
+        print(f"🔍 [MICROSERVICIO] Resultado para {registro['cedula']}: existe={existe_en_bd}, mensaje={mensaje_duplicado}")
+        
+        if existe_en_bd:
+            # Crear clave única para identificar el duplicado
+            clave_duplicado = f"{registro['cedula']}-{registro['fecha'].strftime('%Y-%m-%d')}-{registro['tipo']}"
+            duplicados_bd.add(clave_duplicado)
+            print(f"⚠️ [MICROSERVICIO] Duplicado encontrado en BD: {clave_duplicado}")
+
+    print(f"🔍 [MICROSERVICIO] Total duplicados encontrados en BD: {len(duplicados_bd)}")
+    
+    # Ahora procesar todas las filas
     for row_idx in range(6, sheet.max_row + 1):
         fila = sheet[row_idx]
         fila_visible = any(cell.value is not None for cell in fila)
@@ -173,6 +271,7 @@ async def validar_excel(
         print(f"\n🔍 Validando fila {row_idx}...")
         fila_valida = True
 
+        # Validar campos obligatorios
         for campo, col_idx in campos_obligatorios.items():
             cell = fila[col_idx]
             valor = cell.value
@@ -185,19 +284,19 @@ async def validar_excel(
             else:
                 print(f"✅ Fila {row_idx}, Columna {col_idx + 1} ({campo}): OK → '{valor}'")
             
-                #VALIDACIONES EXTRA
+                # VALIDACIONES EXTRA
                 
-                #3.LONGITUD DE MENSAJE EN DETALLE NOVEDAD
+                # 3. LONGITUD DE MENSAJE EN DETALLE NOVEDAD
                 if campo == "DETALLE NOVEDAD":
                     texto = str(valor).strip()
-                    longitud = len (texto)
+                    longitud = len(texto)
                     if longitud < 15 or longitud > 125:
                         errores.append(
                             f"❌ Fila {row_idx}, Columna {col_idx + 1} (DETALLE NOVEDAD): debe tener entre 15 y 125 caracteres. Tiene {longitud}."
                         )
                         fila_valida = False
                 
-                #4. SIN CARACTERES RAROS (# $ @ . ! ¡ ¿ ? .) EN NOMBRE
+                # 4. SIN CARACTERES RAROS EN NOMBRE
                 if campo == "NOMBRE (APELLIDOS-NOMBRES)":
                     texto = str(valor).strip()
                     if not all(char.isalpha() or char.isspace() or char in "áéíóúÁÉÍÓÚñÑ" for char in texto):
@@ -206,7 +305,7 @@ async def validar_excel(
                         )
                         fila_valida = False
                 
-                #5. CAMPO CEDULA SOLO NUMEROS
+                # 5. CAMPO CEDULA SOLO NUMEROS
                 if campo == "CEDULA":
                     texto = str(valor).strip()
                     if not texto.isdigit():
@@ -215,7 +314,7 @@ async def validar_excel(
                         )
                         fila_valida = False
 
-        # Validaciones automáticas por columnas generadas (solo si hay fila visible)
+        # Validaciones automáticas por columnas generadas
         cell_A = fila[0]  # Columna A
         cell_B = fila[1]  # Columna B
         cell_E = fila[4]  # Columna E
@@ -226,68 +325,72 @@ async def validar_excel(
         numero_esperado = row_idx - 5
         if cell_A.value != numero_esperado:
             errores.append(f"❌ Fila {row_idx}, columna A: Se esperaba el número '{numero_esperado}' y llegó '{cell_A.value}'")
+            fila_valida = False
 
         # B: Fecha del día
-        fecha_b = cell_B.value
-        if isinstance(fecha_b, datetime):
-            fecha_b = fecha_b.date()
-        hoy = datetime.now().date()
+        fecha_b = normalizar_fecha(cell_B.value)
+        hoy = normalizar_fecha(datetime.now())
         if fecha_b != hoy:
             errores.append(f"❌ Fila {row_idx}, columna B: Se esperaba la fecha '{hoy.strftime('%d/%m/%Y')}' y llegó '{cell_B.value}'")
+            fila_valida = False
 
         # E: Título
         if str(cell_E.value).strip() != titulo.strip():
             errores.append(f"❌ Fila {row_idx}, columna E: Se esperaba el título '{titulo}' y llegó '{cell_E.value}'")
+            fila_valida = False
 
         # F: Tienda
         if str(cell_F.value).strip() != nombreTienda.strip():
             errores.append(f"❌ Fila {row_idx}, columna F: Se esperaba la tienda '{nombreTienda}' y llegó '{cell_F.value}'")
+            fila_valida = False
 
         # G: Jefe
         if str(cell_G.value).strip() != nombreUsuario.strip():
             errores.append(f"❌ Fila {row_idx}, columna G: Se esperaba el nombre del jefe '{nombreUsuario}' y llegó '{cell_G.value}'")
+            fila_valida = False
         
-        #VALIDACIONES EXTRA
+        # VALIDACIONES EXTRA
         
-        #2.No puede estar la misma persona el mismo día en la misma solicitud
+        # 2. No puede estar la misma persona el mismo día en la misma solicitud (dentro del archivo)
         cedula_idx = campos_obligatorios.get("CEDULA")
-        fecha_idx = 1 # COLUMNA B --> FECHA
+        fecha_idx = 1  # COLUMNA B --> FECHA
         
         cedula_val = str(fila[cedula_idx].value).strip() if cedula_idx is not None else ""
         fecha_val = fila[fecha_idx].value
         
         if isinstance(fecha_val, datetime):
-            fecha_val = fecha_val.date()
+            fecha_val = fecha_val.replace(hour=5, minute=0, second=0, microsecond=0)
         elif isinstance(fecha_val, str):
             try:
-                fecha_val = datetime.strptime(fecha_val, "%d/%m/%Y").date()
+                fecha_val = datetime.strptime(fecha_val.strip(), "%d/%m/%Y").replace(hour=5, minute=0, second=0, microsecond=0)
             except Exception:
                 fecha_val = None
         
-        clave = f"{cedula_val}-{fecha_val}"
+        # Clave para duplicados en el mismo archivo
+        clave_archivo = f"{cedula_val}-{fecha_val}"
         
-        if clave in duplicados_cedula_fecha:
+        if clave_archivo in duplicados_cedula_fecha:
             errores.append(
-                f"❌ Fila {row_idx}: La persona con cédula {cedula_val} ya tiene una solicitud registrada el día {fecha_val}."
+                f"❌ Fila {row_idx}: La persona con cédula {cedula_val} ya tiene una solicitud registrada el día {fecha_val.strftime('%d/%m/%Y') if fecha_val else 'fecha inválida'} en este archivo."
             )
             fila_valida = False
-        else: duplicados_cedula_fecha.add(clave)
+        else:
+            duplicados_cedula_fecha.add(clave_archivo)
         
-        #VALIDAR DUPLICADOS EN BD DESDE EN BACKEND
-        detalle_idx = campos_obligatorios.get("DETALLE NOVEDAD")
-        detalle_val = str(fila[detalle_idx].value).strip() if detalle_idx is not None else ""
-        
-        print(f"🔄 Verificando duplicado en BD: {cedula_val} | {fecha_val} | {tipo} | {detalle_val}")
-
-        
-        existe_en_bd, mensaje_duplicado = validar_duplicado_en_backend(
-            cedula_val, fecha_val.strftime("%Y-%m-%d") if isinstance(fecha_val, datetime) else str(fecha_val), tipo, detalle_val
-        )
-        
-        if existe_en_bd:
-            errores.append(f"❌ Fila {row_idx}: novedad duplicada en base de datos – {mensaje_duplicado}")
-            fila_valida = False  
+        # VALIDAR DUPLICADOS EN BD (usando los datos pre-validados)
+        if fecha_val:  # Solo validar si la fecha es válida
+            clave_bd = f"{cedula_val}-{fecha_val.strftime('%Y-%m-%d')}-{tipo}"
+            print(f"🔍 [MICROSERVICIO] Verificando clave BD: {clave_bd}")
+            print(f"🔍 [MICROSERVICIO] Duplicados BD encontrados: {duplicados_bd}")
             
+            if clave_bd in duplicados_bd:
+                mensaje_error = f"❌ Fila {row_idx}: Ya existe una novedad en la base de datos con cédula {cedula_val}, fecha {fecha_val.strftime('%d/%m/%Y')} y tipo '{tipo}'"
+                print(f"⚠️ [MICROSERVICIO] {mensaje_error}")
+                errores.append(mensaje_error)
+                fila_valida = False
+            else:
+                print(f"✅ [MICROSERVICIO] No hay duplicado en BD para: {clave_bd}")
+        
         if fila_valida:
             print(f"✅ Fila {row_idx} completa y válida.")
             cantidad_solicitudes += 1
@@ -296,11 +399,12 @@ async def validar_excel(
 
     if errores:
         print("\n🛑 Validación terminada con errores.")
+        print(f"🛑 Total errores: {len(errores)}")
         return {
             "valido": False,
             "errores": errores,
             "tipoValidado": tipo,
-            "cantiddadSolicitudes": cantidad_solicitudes
+            "cantidadSolicitudes": cantidad_solicitudes
         }
 
     print(f"\n✅ Validación exitosa. Total solicitudes válidas: {cantidad_solicitudes}")

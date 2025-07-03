@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma.service';
 import { getMensajePorEstadoBackend } from 'src/utils/getMensajePorEstado';
 
@@ -19,6 +20,14 @@ interface FiltrosParaNomina {
   };
   estado?: string;
 }
+
+// interface DetalleNovedadMasiva {
+//   id_detalle: number;
+//   fecha: string;
+//   cedula: string;
+//   categoria: string;
+//   detalle: string;
+// }
 
 @Injectable()
 export class NovedadeService {
@@ -49,6 +58,11 @@ export class NovedadeService {
         id_tipo_novedad: idTipoNovedad,
         es_masiva: esMasiva,
         cantidad_solicitudes: cantidadSolicitudes,
+        fecha_creacion: (() => {
+          const fecha = new Date();
+          fecha.setHours(0, 0, 0, 0);
+          return fecha;
+        })(),
       },
     });
   }
@@ -354,7 +368,7 @@ export class NovedadeService {
     return this.prisma.novedad.findMany({
       where: whereCondition,
       orderBy: {
-        fecha_creacion: 'desc',
+        id_novedad: 'desc',
       },
       select: {
         id_novedad: true,
@@ -440,7 +454,7 @@ export class NovedadeService {
 
     return this.prisma.detalleNovedadMasiva.findMany({
       where: whereCondition,
-      orderBy: { fecha: 'asc' },
+      orderBy: { id_novedad: 'desc' },
       select: {
         id_novedad: true,
         n: true,
@@ -538,7 +552,6 @@ export class NovedadeService {
         ...(filtros.fecha && {
           fecha_creacion: filtros.fecha,
         }),
-        // ❌ ¡OJO! NO pongas filtro por estado acá
       },
       include: {
         estado_novedad: true,
@@ -554,7 +567,7 @@ export class NovedadeService {
         },
       },
       orderBy: {
-        fecha_creacion: 'desc',
+        id_novedad: 'desc',
       },
     });
   }
@@ -619,7 +632,7 @@ export class NovedadeService {
 
     return this.prisma.detalleNovedadMasiva.findMany({
       where: whereCondition,
-      orderBy: { fecha: 'asc' },
+      orderBy: { id_novedad: 'desc' },
       select: {
         id_novedad: true,
         n: true,
@@ -696,106 +709,121 @@ export class NovedadeService {
     };
   }
 
-  private similitudRapida(a: string, b: string): number {
-    const palabrasA = a.split(/\s+/);
-    const palabrasB = b.split(/\s+/);
+  async existeDuplicado(input: {
+    cedula: string;
+    nombre: string;
+    tipo: string;
+    fecha: string; // viene como string '2025-07-03 05:00:00'
+  }): Promise<boolean> {
+    try {
+      console.log('🔍 [SERVICE] Iniciando validación duplicado:', input);
 
-    const total = new Set([...palabrasA, ...palabrasB]).size;
-    const comunes = palabrasA.filter((p) => palabrasB.includes(p)).length;
+      // Convertir la fecha string a Date object
+      const fechaConvertida = new Date(input.fecha);
 
-    return comunes / total;
+      // Verificar que la fecha sea válida
+      if (isNaN(fechaConvertida.getTime())) {
+        console.error('❌ [SERVICE] Fecha inválida:', input.fecha);
+        return false;
+      }
+
+      console.log('🔍 [SERVICE] Buscando duplicado con:', {
+        cedula: input.cedula,
+        tipo: input.tipo,
+        fechaOriginal: input.fecha,
+        fechaConvertida: fechaConvertida.toISOString(),
+      });
+
+      // Buscar por cédula, fecha y tipo
+      const where: Prisma.DetalleNovedadMasivaWhereInput = {
+        cedula: input.cedula,
+        categoria: input.tipo, // El tipo se guarda en el campo 'detalle'
+        fecha: fechaConvertida,
+      };
+
+      console.log('🔍 [SERVICE] Query WHERE:', where);
+
+      const resultado = await this.prisma.detalleNovedadMasiva.findFirst({
+        where,
+        select: {
+          cedula: true,
+          fecha: true,
+          categoria: true,
+          nombre: true,
+        },
+      });
+
+      console.log('🔍 [SERVICE] Resultado búsqueda:', resultado);
+
+      const existeDuplicado = resultado !== null;
+      console.log('🔍 [SERVICE] ¿Existe duplicado?', existeDuplicado);
+
+      return existeDuplicado;
+    } catch (error) {
+      console.error('❌ [SERVICE] Error al validar duplicado:', error);
+      return false;
+    }
   }
 
-  async validarDuplicado({
-    cedula,
-    fecha,
-    tipo,
-    detalle,
-  }: {
+  // Método alternativo MÁS ROBUSTO (recomendado usar este)
+  async existeDuplicadoRobusto(input: {
     cedula: string;
-    fecha: string;
     tipo: string;
-    detalle: string;
-  }): Promise<{ existe: boolean; mensaje?: string }> {
-    const tipoNovedad = await this.prisma.tipo_novedad.findFirst({
-      where: {
-        nombre_tipo: {
-          equals: tipo,
-          mode: 'insensitive',
-        },
-      },
-      select: {
-        id_tipo_novedad: true,
-      },
-    });
+    fecha: string; // '2025-07-03 05:00:00'
+  }): Promise<boolean> {
+    try {
+      console.log('🔍 [SERVICE-ROBUSTO] Iniciando validación:', input);
 
-    if (!tipoNovedad) {
-      return {
-        existe: false,
-        mensaje: `No se encontró el tipo de novedad "${tipo}".`,
+      const [fechaParte, horaParte] = input.fecha.split(' ');
+      const [anio, mes, dia] = fechaParte.split('-').map(Number);
+      const [hora, minuto, segundo] = horaParte.split(':').map(Number);
+
+      // ⚠️ OJO: mes en Date.UTC empieza desde 0 (enero)
+      const fechaExacta = new Date(
+        Date.UTC(anio, mes - 1, dia, hora, minuto, segundo),
+      );
+
+      console.log(
+        '📅 [SERVICE-ROBUSTO] Fecha ISO local para consulta:',
+        fechaExacta,
+      );
+
+      const where: Prisma.DetalleNovedadMasivaWhereInput = {
+        cedula: input.cedula,
+        categoria: input.tipo,
+        fecha: fechaExacta, // esto crea un Date válido para Prisma
       };
-    }
 
-    const fechaInicio = new Date(fecha);
-    fechaInicio.setHours(0, 0, 0, 0);
+      console.log('🔍 [SERVICE-ROBUSTO] Query WHERE:', where);
 
-    const fechaFin = new Date(fecha);
-    fechaFin.setHours(23, 59, 59, 999);
+      const fechaDesde = new Date(fechaExacta);
+      fechaDesde.setSeconds(0, 0);
 
-    const posibles = await this.prisma.detalleNovedadMasiva.findMany({
-      where: {
-        cedula: { equals: cedula, mode: 'insensitive' },
-        fecha: { gte: fechaInicio, lte: fechaFin },
-        novedad: {
-          id_tipo_novedad: tipoNovedad.id_tipo_novedad,
+      const fechaHasta = new Date(fechaExacta);
+      fechaHasta.setSeconds(59, 999);
+
+      const resultado = await this.prisma.detalleNovedadMasiva.findFirst({
+        where: {
+          cedula: input.cedula,
+          categoria: input.tipo,
+          fecha: {
+            gte: fechaDesde,
+            lte: fechaHasta,
+          },
         },
-      },
-      include: {
-        novedad: true, // Asegura que Prisma haga el join correctamente
-      },
-    });
+        select: {
+          cedula: true,
+          fecha: true,
+          categoria: true,
+        },
+      });
 
-    console.log(
-      '🔁 Posibles duplicados encontrados:',
-      posibles.map((p) => ({
-        cedula: p.cedula,
-        fecha: p.fecha,
-        tipo: p.novedad?.id_tipo_novedad,
-        detalle: p.detalle,
-      })),
-    );
+      console.log('🔍 [SERVICE-ROBUSTO] Resultado búsqueda:', resultado);
 
-    for (const p of posibles) {
-      const detalleBD = (p.detalle ?? '').trim().toLowerCase();
-      const detalleNuevo = detalle.trim().toLowerCase();
-
-      if (detalleBD === detalleNuevo) {
-        return {
-          existe: true,
-          mensaje: 'Ya existe una novedad con el mismo detalle exacto.',
-        };
-      }
-
-      const similitud = this.similitudRapida(detalleBD, detalleNuevo);
-      if (similitud >= 0.9) {
-        return {
-          existe: true,
-          mensaje: 'Ya existe una novedad con un detalle muy similar.',
-        };
-      }
+      return resultado !== null;
+    } catch (error) {
+      console.error('❌ [SERVICE-ROBUSTO] Error al validar duplicado:', error);
+      return false;
     }
-    console.log('🚫 No se encontró duplicado. Detalles de búsqueda:');
-    console.log({
-      tipoNovedad,
-      posibles: posibles.map((p) => ({
-        id: p.id_detalle,
-        fecha: p.fecha,
-        cedula: p.cedula,
-        tipoNovedadEnBD: p.novedad?.id_tipo_novedad,
-        detalle: p.detalle,
-      })),
-    });
-
-    return { existe: false };
   }
 }

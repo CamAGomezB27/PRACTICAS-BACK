@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy as JwtStrategyBase } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
+import { PassportStrategy } from '@nestjs/passport';
 import { Request } from 'express';
+import { ExtractJwt, Strategy as JwtStrategyBase } from 'passport-jwt';
 
 interface JwtPayload {
   correo: string;
@@ -23,17 +23,24 @@ export class JwtStrategy extends PassportStrategy(JwtStrategyBase) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         (req: Request): string | null => {
-          const cookies = req?.cookies as { jwt?: string };
-          return cookies?.jwt ?? null;
+          const cookies = req.cookies as { jwt?: string }; // ← tipado explícito
+          if (cookies?.jwt) return cookies.jwt;
+
+          const authHeader = req.headers.authorization;
+          if (authHeader?.startsWith('Bearer ')) {
+            return authHeader.slice(7);
+          }
+
+          return null;
         },
       ]),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET') as string,
+      secretOrKey: configService.get<string>('JWT_SECRET')!, // ← forzado aquí
     });
   }
 
   validate(payload: JwtPayload): JwtPayload {
-    console.log('Playload JWT recibido:', payload);
+    console.log('✅ JWT validado con éxito:', payload);
     return payload;
   }
 }
