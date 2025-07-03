@@ -285,4 +285,19 @@ export class NovedadController {
       !esJefe, // esTienda
     );
   }
+
+  @Get('validar-duplicado')
+  async validarDuplicado(
+    @Query('cedula') cedula: string,
+    @Query('fecha') fecha: string,
+    @Query('tipo') tipo: string,
+    @Query('detalle') detalle: string,
+  ) {
+    return this.novedadService.validarDuplicado({
+      cedula,
+      fecha,
+      tipo,
+      detalle,
+    });
+  }
 }

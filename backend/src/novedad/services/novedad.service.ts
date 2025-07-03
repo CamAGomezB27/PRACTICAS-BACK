@@ -695,4 +695,107 @@ export class NovedadeService {
       message: `Se actualizaron ${idsNovedades.length} novedades correctamente.`,
     };
   }
+
+  private similitudRapida(a: string, b: string): number {
+    const palabrasA = a.split(/\s+/);
+    const palabrasB = b.split(/\s+/);
+
+    const total = new Set([...palabrasA, ...palabrasB]).size;
+    const comunes = palabrasA.filter((p) => palabrasB.includes(p)).length;
+
+    return comunes / total;
+  }
+
+  async validarDuplicado({
+    cedula,
+    fecha,
+    tipo,
+    detalle,
+  }: {
+    cedula: string;
+    fecha: string;
+    tipo: string;
+    detalle: string;
+  }): Promise<{ existe: boolean; mensaje?: string }> {
+    const tipoNovedad = await this.prisma.tipo_novedad.findFirst({
+      where: {
+        nombre_tipo: {
+          equals: tipo,
+          mode: 'insensitive',
+        },
+      },
+      select: {
+        id_tipo_novedad: true,
+      },
+    });
+
+    if (!tipoNovedad) {
+      return {
+        existe: false,
+        mensaje: `No se encontró el tipo de novedad "${tipo}".`,
+      };
+    }
+
+    const fechaInicio = new Date(fecha);
+    fechaInicio.setHours(0, 0, 0, 0);
+
+    const fechaFin = new Date(fecha);
+    fechaFin.setHours(23, 59, 59, 999);
+
+    const posibles = await this.prisma.detalleNovedadMasiva.findMany({
+      where: {
+        cedula: { equals: cedula, mode: 'insensitive' },
+        fecha: { gte: fechaInicio, lte: fechaFin },
+        novedad: {
+          id_tipo_novedad: tipoNovedad.id_tipo_novedad,
+        },
+      },
+      include: {
+        novedad: true, // Asegura que Prisma haga el join correctamente
+      },
+    });
+
+    console.log(
+      '🔁 Posibles duplicados encontrados:',
+      posibles.map((p) => ({
+        cedula: p.cedula,
+        fecha: p.fecha,
+        tipo: p.novedad?.id_tipo_novedad,
+        detalle: p.detalle,
+      })),
+    );
+
+    for (const p of posibles) {
+      const detalleBD = (p.detalle ?? '').trim().toLowerCase();
+      const detalleNuevo = detalle.trim().toLowerCase();
+
+      if (detalleBD === detalleNuevo) {
+        return {
+          existe: true,
+          mensaje: 'Ya existe una novedad con el mismo detalle exacto.',
+        };
+      }
+
+      const similitud = this.similitudRapida(detalleBD, detalleNuevo);
+      if (similitud >= 0.9) {
+        return {
+          existe: true,
+          mensaje: 'Ya existe una novedad con un detalle muy similar.',
+        };
+      }
+    }
+    console.log('🚫 No se encontró duplicado. Detalles de búsqueda:');
+    console.log({
+      tipoNovedad,
+      posibles: posibles.map((p) => ({
+        id: p.id_detalle,
+        fecha: p.fecha,
+        cedula: p.cedula,
+        tipoNovedadEnBD: p.novedad?.id_tipo_novedad,
+        detalle: p.detalle,
+      })),
+    });
+
+    return { existe: false };
+  }
 }
