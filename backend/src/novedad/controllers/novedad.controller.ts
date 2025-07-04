@@ -248,15 +248,6 @@ export class NovedadController {
     const { id_usuario, esJefe } = req.user as JwtPayload;
     const idNovedad = parseInt(id, 10);
 
-    // // Mapear ID de estado a string
-    // const estadoMap: Record<number, string> = {
-    //   1: 'CREADA',
-    //   2: 'EN GESTIÓN',
-    //   3: 'GESTIONADA',
-    // };
-
-    // const estadoStr = estadoMap[body.nuevoEstadoId] ?? 'DESCONOCIDO';
-
     // Generar mensaje dinámico según rol y estado
     const descripcion = getMensajePorEstadoBackendPorId(
       body.nuevoEstadoId,

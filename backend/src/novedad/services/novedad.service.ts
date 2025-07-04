@@ -712,62 +712,6 @@ export class NovedadeService {
     };
   }
 
-  async existeDuplicado(input: {
-    cedula: string;
-    nombre: string;
-    tipo: string;
-    fecha: string; // viene como string '2025-07-03 05:00:00'
-  }): Promise<boolean> {
-    try {
-      console.log('🔍 [SERVICE] Iniciando validación duplicado:', input);
-
-      // Convertir la fecha string a Date object
-      const fechaConvertida = new Date(input.fecha);
-
-      // Verificar que la fecha sea válida
-      if (isNaN(fechaConvertida.getTime())) {
-        console.error('❌ [SERVICE] Fecha inválida:', input.fecha);
-        return false;
-      }
-
-      console.log('🔍 [SERVICE] Buscando duplicado con:', {
-        cedula: input.cedula,
-        tipo: input.tipo,
-        fechaOriginal: input.fecha,
-        fechaConvertida: fechaConvertida.toISOString(),
-      });
-
-      // Buscar por cédula, fecha y tipo
-      const where: Prisma.DetalleNovedadMasivaWhereInput = {
-        cedula: input.cedula,
-        categoria: input.tipo, // El tipo se guarda en el campo 'detalle'
-        fecha: fechaConvertida,
-      };
-
-      console.log('🔍 [SERVICE] Query WHERE:', where);
-
-      const resultado = await this.prisma.detalleNovedadMasiva.findFirst({
-        where,
-        select: {
-          cedula: true,
-          fecha: true,
-          categoria: true,
-          nombre: true,
-        },
-      });
-
-      console.log('🔍 [SERVICE] Resultado búsqueda:', resultado);
-
-      const existeDuplicado = resultado !== null;
-      console.log('🔍 [SERVICE] ¿Existe duplicado?', existeDuplicado);
-
-      return existeDuplicado;
-    } catch (error) {
-      console.error('❌ [SERVICE] Error al validar duplicado:', error);
-      return false;
-    }
-  }
-
   // Método alternativo MÁS ROBUSTO (recomendado usar este)
   async existeDuplicadoRobusto(input: {
     cedula: string;
