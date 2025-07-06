@@ -686,10 +686,10 @@ export class NovedadeService {
     const estadoStr = estadoMap[nuevoEstadoId] ?? 'DESCONOCIDO';
 
     for (const id of idsNovedades) {
-      const nuevaDescripcion = getMensajePorEstadoBackendPorId(
-        nuevoEstadoId,
-        !esTienda,
-      );
+      const nuevaDescripcion = getMensajePorEstadoBackendPorId(nuevoEstadoId, {
+        esNomina: !esTienda,
+        esJefe: esTienda, // o false si no aplica
+      });
 
       // Cambiar estado + descripción
       await this.prisma.novedad.update({

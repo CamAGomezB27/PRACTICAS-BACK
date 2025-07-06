@@ -1,10 +1,8 @@
 export function getMensajePorEstadoBackendPorId(
   idEstado: number,
-  esNomina: boolean,
+  user: { esNomina: boolean; esJefe: boolean },
 ): string {
-  console.log('🔍 getMensajePorEstadoBackendPorId → esNomina:', esNomina);
-
-  if (esNomina) {
+  if (user.esNomina) {
     switch (idEstado) {
       case 1: // 'PENDIENTE' para Nómina
         return 'Solicitud recibida. Aún no ha sido gestionada.';
@@ -15,9 +13,9 @@ export function getMensajePorEstadoBackendPorId(
       default:
         return '';
     }
-  } else {
+  } else if (user.esJefe) {
     switch (idEstado) {
-      case 1: // 'CREADA' para Tienda
+      case 1:
         return 'Archivo subido correctamente. Tu solicitud está lista para ser validada por el equipo de Nómina.';
       case 2:
         return 'El equipo de Nómina se encuentra validando tus solicitudes de esta novedad.';
@@ -27,4 +25,5 @@ export function getMensajePorEstadoBackendPorId(
         return '';
     }
   }
+  return '';
 }

@@ -249,10 +249,10 @@ export class NovedadController {
     const idNovedad = parseInt(id, 10);
 
     // Generar mensaje dinámico según rol y estado
-    const descripcion = getMensajePorEstadoBackendPorId(
-      body.nuevoEstadoId,
-      !esJefe,
-    ); // es tienda si no es jefe
+    const descripcion = getMensajePorEstadoBackendPorId(body.nuevoEstadoId, {
+      esNomina: !esJefe,
+      esJefe: esJefe,
+    });
 
     return this.novedadService.cambiarEstadoNovedad(
       idNovedad,

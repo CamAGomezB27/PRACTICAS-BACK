@@ -212,7 +212,19 @@ export class ArchivoAdjuntoController {
 
       const idTipoNovedad = mapaTiposNovedad[titulo] ?? null;
 
-      const mensaje = getMensajePorEstadoBackendPorId(1, req.user.esNomina);
+      console.log('🚀 Entrando a crearNovedad masiva');
+      console.log('🤖 req.user:', req.user);
+
+      const rol = {
+        esNomina: req.user.esNomina,
+        esJefe: req.user.esJefe,
+      };
+
+      console.log('🧠 Rol extraído:', rol);
+
+      const mensaje = getMensajePorEstadoBackendPorId(1, rol);
+
+      console.log('📩 Mensaje generado:', mensaje);
 
       const novedad = await this.novedadService.crearNovedad({
         idUsuario: req.user.id_usuario,
