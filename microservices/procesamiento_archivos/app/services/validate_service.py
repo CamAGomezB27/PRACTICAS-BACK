@@ -8,6 +8,7 @@ from fastapi import Header
 
 TIPOS_PERMITIDOS = {
     "Auxilio de transporte": "SOLICITUDES.xlsx",
+    "Descuento": "SOLICITUDES.xlsx",
     "Otros": "SOLICITUDES.xlsx",
     "Otro Si Definitivo": "SOLICITUDES.xlsx",
     "Horas Extra": "SOLICITUDES2.xlsx",
