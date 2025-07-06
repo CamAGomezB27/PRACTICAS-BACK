@@ -5,6 +5,9 @@ from datetime import datetime
 import httpx
 import openpyxl.utils
 from fastapi import Header
+import unicodedata
+import re
+
 
 TIPOS_PERMITIDOS = {
     "Auxilio de transporte": "SOLICITUDES.xlsx",
@@ -15,6 +18,13 @@ TIPOS_PERMITIDOS = {
     "Otro Si Temporal": "SOLICITUDES3.xlsx",
     "Vacaciones": "SOLICITUDES4.xlsx",
 }
+
+MESES_ES = {
+    "01": "enero", "02": "febrero", "03": "marzo", "04": "abril",
+    "05": "mayo", "06": "junio", "07": "julio", "08": "agosto",
+    "09": "septiembre", "10": "octubre", "11": "noviembre", "12": "diciembre"
+}
+
 
 def validar_horas_extra(fila, row_idx, campos_obligatorios, errores):
     fila_valida = True
@@ -64,22 +74,168 @@ def validar_horas_extra(fila, row_idx, campos_obligatorios, errores):
 
     return fila_valida
 
+def normalizar_texto(texto: str):
+    texto = texto.lower()
+    texto = unicodedata.normalize("NFD", texto)
+    texto = "".join(c for c in texto if unicodedata.category(c) != "Mn")  # quitar tildes
+    return texto
+
+
+def validar_otro_si_temporal(fila, row_idx, campos_obligatorios, errores):
+    fila_valida = True
+    
+    #VALIDACIÓN EN CAMPOS JORNADAS
+    jornadas_validas = {"JORNADA 33%", "JORNADA 75%", "JORNADA 50%", "JORNADA 100%"}
+    jornada_empleado_idx = campos_obligatorios.get("JORNADA EMPLEADO")
+    jornada_otro_si_idx = campos_obligatorios.get("JORNADA OTRO SI TEMPORAL")
+    
+    # ✅ Extraer valores
+    jornada_empleado = str(fila[jornada_empleado_idx].value).strip() if jornada_empleado_idx is not None else ""
+    jornada_otro_si =str(fila[jornada_otro_si_idx].value).strip() if jornada_otro_si_idx is not None else ""
+    
+    if jornada_empleado not in jornadas_validas:
+        errores.append(
+            f"❌ Fila {row_idx}, Columna {jornada_empleado_idx + 1} (JORNADA EMPLEADO): Valor inválido '{jornada_empleado}'."
+        )
+        fila_valida = False
+        
+    if jornada_otro_si not in jornadas_validas:
+        errores.append(
+            f"❌ Fila {row_idx}, Columna {jornada_otro_si_idx + 1} (JORNADA OTRO SI TEMPORAL): Valor inválido '{jornada_otro_si}'."
+        )
+        fila_valida = False
+        
+    #VALIDAR FECHAS
+    fecha_inicio_idx = campos_obligatorios.get("FECHA INICIO")
+    fecha_fin_idx = campos_obligatorios.get("FECHA FIN")
+    
+    # ✅ Extraer y normalizar fechas
+    fecha_inicio_val = fila[fecha_inicio_idx].value if fecha_inicio_idx is not None else None
+    fecha_fin_val = fila[fecha_fin_idx].value if fecha_fin_idx is not None else None
+
+    fecha_inicio = normalizar_fecha(fecha_inicio_val)
+    fecha_fin = normalizar_fecha(fecha_fin_val)
+    
+    if not isinstance(fecha_inicio, datetime):
+        errores.append(
+            f"❌ Fila {row_idx}, Columna {fecha_inicio_idx + 1} (FECHA INICIO): debe ser una fecha válida."
+        )
+        fila_valida = False
+    
+    if not isinstance(fecha_fin, datetime):
+        errores.append(
+            f"❌ Fila {row_idx}, Columna {fecha_fin_idx + 1} (FECHA FIN): debe ser una fecha válida."
+        )
+        fila_valida = False
+    
+    #FECHAS IGUAL QUE EL DETALLE (SI LAS CONTIENE)
+    detalle_idx = campos_obligatorios.get("DETALLE NOVEDAD")
+    detalle = str(fila[detalle_idx].value).strip() if detalle_idx is not None and fila[detalle_idx].value else ""
+
+    if detalle and isinstance(fecha_inicio, datetime) and isinstance(fecha_fin, datetime):
+        detalle_normalizado = normalizar_texto(detalle)
+
+    def fecha_en_detalle(fecha: datetime):
+        dia = int(fecha.day)
+        mes_num = fecha.strftime("%m")
+        mes_nombre = MESES_ES[mes_num]
+        anio = fecha.year
+
+        patrones = [
+            rf"\b{dia}\s*de\s*{mes_nombre}\b",               # 7 de marzo
+            rf"\b{dia}\s*{mes_nombre}\b",                    # 7 marzo
+            rf"\b{dia:02d}/{mes_num}\b",                     # 07/03
+            rf"\b{dia}/{mes_num}\b",                         # 7/03
+            rf"\b{dia:02d}-{mes_num}\b",                     # 07-03
+            rf"\b{dia}-{mes_num}\b",                         # 7-03
+        ]
+
+        # Extra: Buscar rangos tipo "del 1 al 30 abril"
+        # e intentar deducir si fecha está en ese rango
+        match_rango = re.search(r"\bdel\s+(\d{1,2})\s+al\s+(\d{1,2})\s+(?:de\s+)?([a-zA-ZñÑ]+)", detalle_normalizado)
+        if match_rango:
+            dia_inicio = int(match_rango.group(1))
+            dia_fin = int(match_rango.group(2))
+            mes_en_texto = match_rango.group(3).lower()
+
+            if mes_en_texto == mes_nombre and dia_inicio <= dia <= dia_fin:
+                return True
+
+        for patron in patrones:
+            if re.search(patron, detalle_normalizado):
+                return True
+
+        return False
+
+    faltan = []
+    if not fecha_en_detalle(fecha_inicio):
+        faltan.append(f"FECHA INICIO ({fecha_inicio.strftime('%d/%m/%Y')})")
+    if not fecha_en_detalle(fecha_fin):
+        faltan.append(f"FECHA FIN ({fecha_fin.strftime('%d/%m/%Y')})")
+
+    if faltan:
+        errores.append(
+            f"❌ Fila {row_idx}, Columna {detalle_idx + 1} (DETALLE NOVEDAD): El detalle no contiene {', '.join(faltan)}. "
+            f"Se asume que si no se especifica el año, se refiere a {fecha_inicio.year}. "
+            f"Texto actual: \"{detalle}\""
+        )
+        fila_valida = False
+
+
+    
+    #VALIDAR SALARIOS
+    salario_actual_idx = campos_obligatorios.get("SALARIO ACTUAL")
+    salario_otro_si_temp_idx = campos_obligatorios.get("SALARIO OTRO SI TEMPORAL")
+    
+    salario_actual = str(fila[salario_actual_idx].value).strip() if salario_actual_idx is not None else ""
+    salario_otro_si_temp = str(fila[salario_otro_si_temp_idx].value).strip() if salario_otro_si_temp_idx is not None else ""
+    
+    try:
+        float(salario_actual)
+    except Exception:
+        errores.append(
+            f"❌ Fila {row_idx}, Columna {salario_actual_idx + 1} (SALARIO ACTUAL): debe ser numérico. Valor recibido: '{salario_actual}'"
+        )
+        fila_valida = False
+        
+    try:
+        float(salario_otro_si_temp)
+    except Exception:
+        errores.append(
+            f"❌ Fila {row_idx}, Columna {salario_otro_si_temp_idx + 1} (SALARIO OTRO SI TEMPORAL): debe ser numérico. Valor recibido: '{salario_otro_si_temp}'"
+        )
+        fila_valida = False
+    
+    #VALIDACION CONSECUTIVO FORMS
+    consecutivo_idx = campos_obligatorios.get("CONSECUTIVO FORMS")
+    consecutivo_val = str(fila[consecutivo_idx].value).strip() if consecutivo_idx is not None else ""
+    
+    if not consecutivo_val.startswith("OT"):
+        errores.append(
+            f"❌ Fila {row_idx}, Columna {consecutivo_idx + 1} (CONSECUTIVO FORMS): debe comenzar con 'OT'. Valor recibido: '{consecutivo_val}'"
+        )
+        fila_valida = False
+    
+    return fila_valida
+        
 
 VALIDACIONES_ESPECIALES = {
     "Horas Extra": validar_horas_extra,
+    "Otro Si Temporal": validar_otro_si_temporal,
 }
 
 def normalizar_fecha(fecha_raw):
     if isinstance(fecha_raw, datetime):
-        # Forzar hora a las 05:00:00
         return fecha_raw.replace(hour=5, minute=0, second=0, microsecond=0)
     elif isinstance(fecha_raw, str):
-        try:
-            fecha = datetime.strptime(fecha_raw.strip(), "%d/%m/%Y")
-            return fecha.replace(hour=5, minute=0, second=0, microsecond=0)
-        except Exception:
-            return None
+        for fmt in ["%d/%m/%Y", "%Y-%m-%d", "%Y-%m-%d %H:%M:%S"]:
+            try:
+                fecha = datetime.strptime(fecha_raw.strip(), fmt)
+                return fecha.replace(hour=5, minute=0, second=0, microsecond=0)
+            except ValueError:
+                continue
     return None
+
 
 async def validar_duplicado_en_backend(cedula: str, fecha: datetime, tipo: str, nombre: str, jwt_token: str):
     url = "http://localhost:3000/novedad/validar-duplicado"
