@@ -16,6 +16,59 @@ TIPOS_PERMITIDOS = {
     "Vacaciones": "SOLICITUDES4.xlsx",
 }
 
+def validar_horas_extra(fila, row_idx, campos_obligatorios, errores):
+    fila_valida = True
+
+    concepto_idx = campos_obligatorios.get("CONCEPTO")
+    codigo_idx = campos_obligatorios.get("CON_CODIGO")
+    unidad_idx = campos_obligatorios.get("UNIDADES")
+
+    # ✅ Extraer valores
+    concepto = str(fila[concepto_idx].value).strip() if concepto_idx is not None else ""
+    codigo = str(fila[codigo_idx].value).strip() if codigo_idx is not None else ""
+    unidad = str(fila[unidad_idx].value).strip() if unidad_idx is not None else ""
+
+    concepto_valido_map = {
+        "Domingo Sin Compensatorio Diurno": "75",
+        "Domingo Sin Compensatorio Nocturno": "110",
+        "Dominical Con Compensatorio Diurno": "66",
+        "Dominical Con Compensatorio Nocturno": "78",
+        "Festivo Sin Compensatorio Diurno": "75",
+        "Hora extra Diurna": "55",
+        "Recargo Nocturno 35%": "45",
+    }
+
+    # ✅ Validar CONCEPTO
+    if concepto not in concepto_valido_map:
+        errores.append(
+            f"❌ Fila {row_idx}, Columna {concepto_idx + 1} (CONCEPTO): \"{concepto}\" no es válido. Verifica que esté escrito correctamente según las opciones disponibles."
+        )
+        fila_valida = False
+    else:
+        # ✅ Validar que el código corresponde al concepto
+        codigo_esperado = concepto_valido_map[concepto]
+        if codigo != codigo_esperado:
+            errores.append(
+                f"❌ Fila {row_idx}, Columna {codigo_idx + 1} (CON_CODIGO): se esperaba \"{codigo_esperado}\" para el concepto \"{concepto}\", pero llegó \"{codigo}\"."
+            )
+            fila_valida = False
+
+    # ✅ Validar UNIDADES
+    try:
+        float(unidad)
+    except Exception:
+        errores.append(
+            f"❌ Fila {row_idx}, Columna {unidad_idx + 1} (UNIDADES): debe ser un número válido (puede tener decimales). Valor ingresado: \"{unidad}\"."
+        )
+        fila_valida = False
+
+    return fila_valida
+
+
+VALIDACIONES_ESPECIALES = {
+    "Horas Extra": validar_horas_extra,
+}
+
 def normalizar_fecha(fecha_raw):
     if isinstance(fecha_raw, datetime):
         # Forzar hora a las 05:00:00
@@ -291,9 +344,9 @@ async def validar_excel(
                 if campo == "DETALLE NOVEDAD":
                     texto = str(valor).strip()
                     longitud = len(texto)
-                    if longitud < 15 or longitud > 125:
+                    if longitud < 15 or longitud > 250:
                         errores.append(
-                            f"❌ Fila {row_idx}, Columna {col_idx + 1} (DETALLE NOVEDAD): debe tener entre 15 y 125 caracteres. Tiene {longitud}."
+                            f"❌ Fila {row_idx}, Columna {col_idx + 1} (DETALLE NOVEDAD): debe tener entre 15 y 250 caracteres. Tiene {longitud}."
                         )
                         fila_valida = False
                 
@@ -391,6 +444,13 @@ async def validar_excel(
                 fila_valida = False
             else:
                 print(f"✅ [MICROSERVICIO] No hay duplicado en BD para: {clave_bd}")
+        
+        if tipo in VALIDACIONES_ESPECIALES and fila_valida:
+            funcion_validadora = VALIDACIONES_ESPECIALES[tipo]
+            resultado_especial = funcion_validadora(fila, row_idx, campos_obligatorios, errores)
+            if not resultado_especial:
+                print(f"⚠️ Fila {row_idx} falló la validación especial para tipo '{tipo}'")
+                fila_valida = False
         
         if fila_valida:
             print(f"✅ Fila {row_idx} completa y válida.")
