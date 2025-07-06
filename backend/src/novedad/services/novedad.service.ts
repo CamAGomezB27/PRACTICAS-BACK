@@ -251,6 +251,9 @@ export class NovedadeService {
 
     const resultados = await this.prisma.detalleNovedadMasiva.findMany({
       where: whereCondition,
+      orderBy: {
+        id_novedad: 'asc',
+      },
       select: {
         id_novedad: true,
         n: true,
