@@ -550,11 +550,18 @@ async def validar_excel(
                 # 5. CAMPO CEDULA SOLO NUMEROS
                 if campo == "CEDULA":
                     texto = str(valor).strip()
-                    if not texto.isdigit():
+
+                    if texto.lower() == "none" or texto == "":
+                        errores.append(
+                            f"❌ Fila {row_idx}, Columna {col_idx + 1} (CÉDULA): no puede estar vacía ni ser 'None'."
+                        )
+                        fila_valida = False
+                    elif not texto.isdigit():
                         errores.append(
                             f"❌ Fila {row_idx}, Columna {col_idx + 1} (CÉDULA): debe contener solo números. Valor recibido: '{texto}'."
                         )
                         fila_valida = False
+
 
         # Validaciones automáticas por columnas generadas
         cell_A = fila[0]  # Columna A
@@ -607,17 +614,19 @@ async def validar_excel(
                 fecha_val = datetime.strptime(fecha_val.strip(), "%d/%m/%Y").replace(hour=5, minute=0, second=0, microsecond=0)
             except Exception:
                 fecha_val = None
-        
-        # Clave para duplicados en el mismo archivo
-        clave_archivo = f"{cedula_val}-{fecha_val}"
-        
-        if clave_archivo in duplicados_cedula_fecha:
-            errores.append(
-                f"❌ Fila {row_idx}: La persona con cédula {cedula_val} ya tiene una solicitud registrada el día {fecha_val.strftime('%d/%m/%Y') if fecha_val else 'fecha inválida'} en este archivo."
-            )
-            fila_valida = False
+                
+        # Evitar validación de duplicados si la cédula es inválida
+        if not cedula_val or cedula_val.lower() == "none":
+            print(f"⚠️ Fila {row_idx}: Cédula vacía o inválida. Se omite validación de duplicados.")
         else:
-            duplicados_cedula_fecha.add(clave_archivo)
+            clave_archivo = f"{cedula_val}-{fecha_val}"
+            if clave_archivo in duplicados_cedula_fecha:
+                errores.append(
+                    f"❌ Fila {row_idx}: La persona con cédula {cedula_val} ya tiene una solicitud registrada el día {fecha_val.strftime('%d/%m/%Y') if fecha_val else 'fecha inválida'} en este archivo."
+                )
+                fila_valida = False
+            else:
+                duplicados_cedula_fecha.add(clave_archivo)
         
         # VALIDAR DUPLICADOS EN BD (usando los datos pre-validados)
         if fecha_val:  # Solo validar si la fecha es válida
