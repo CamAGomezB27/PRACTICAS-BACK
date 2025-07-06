@@ -400,21 +400,21 @@ export class ArchivoAdjuntoService {
         id_novedad,
         n: this.convertirAEntero(row.getCell('A').value) ?? 0,
         fecha: this.convertirAFecha(row.getCell('B').value),
-        cedula: this.getCellValue(row, 'C') || 'NO APLICA',
-        nombre: this.getCellValue(row, 'D') || 'NO APLICA',
-        categoria: this.getCellValue(row, 'E') || 'NO APLICA',
-        tienda: this.getCellValue(row, 'F') || 'NO APLICA',
-        jefe: this.getCellValue(row, 'G') || 'NO APLICA',
-        detalle: this.getCellValue(row, 'H') || 'NO APLICA',
-        jornada_empleado: this.getCellValue(row, 'I') || 'NO APLICA',
-        jornada_otro_si: this.getCellValue(row, 'J') || 'NO APLICA',
+        cedula: this.getCellValue(row, 'C') || '-',
+        nombre: this.getCellValue(row, 'D') || '-',
+        categoria: this.getCellValue(row, 'E') || '-',
+        tienda: this.getCellValue(row, 'F') || '-',
+        jefe: this.getCellValue(row, 'G') || '-',
+        detalle: this.getCellValue(row, 'H') || '-',
+        jornada_empleado: this.getCellValue(row, 'I') || '-',
+        jornada_otro_si: this.getCellValue(row, 'J') || '-',
         fecha_inicio: this.convertirAFecha(row.getCell('K').value),
         fecha_fin: this.convertirAFecha(row.getCell('L').value),
         salario_actual: this.convertirANumero(row.getCell('M').value) ?? 0,
         salario_otro_si: this.convertirANumero(row.getCell('N').value) ?? 0,
-        consecutivo_forms: this.getCellValue(row, 'O') || 'NO APLICA',
-        concepto: this.getCellValue(row, 'P') || 'NO APLICA',
-        codigo_concepto: this.getCellValue(row, 'Q') || 'NO APLICA',
+        consecutivo_forms: this.getCellValue(row, 'O') || '-',
+        concepto: this.getCellValue(row, 'P') || '-',
+        codigo_concepto: this.getCellValue(row, 'Q') || '-',
         unidades: this.convertirAEntero(row.getCell('R').value) ?? 0,
         fecha_novedad: this.convertirAFecha(row.getCell('S').value),
         fecha_inicio_disfrute: this.convertirAFecha(row.getCell('T').value),
@@ -583,20 +583,20 @@ export class ArchivoAdjuntoService {
     }
   }
 
-  // Helpers de “seguridad” para cada tipo
-  private safeString(v: string | null | undefined): string {
-    return v && v.trim() !== '' ? v : 'NO APLICA';
-  }
+  // // Helpers de “seguridad” para cada tipo
+  // private safeString(v: string | null | undefined): string {
+  //   return v && v.trim() !== '' ? v : 'NO APLICA';
+  // }
 
-  private safeDate(v: Date | string | null | undefined): string {
-    if (!v) return '-';
-    const d = typeof v === 'string' ? new Date(v) : v;
-    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('es-CO');
-  }
+  // private safeDate(v: Date | string | null | undefined): string {
+  //   if (!v) return '-';
+  //   const d = typeof v === 'string' ? new Date(v) : v;
+  //   return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('es-CO');
+  // }
 
-  private safeNumber(v: number | null | undefined): number {
-    return typeof v === 'number' && !isNaN(v) ? v : 0;
-  }
+  // private safeNumber(v: number | null | undefined): number {
+  //   return typeof v === 'number' && !isNaN(v) ? v : 0;
+  // }
 
   async generarConsolidadoPostNomina(
     solicitudes: SolicitudConIdDetalle[],
