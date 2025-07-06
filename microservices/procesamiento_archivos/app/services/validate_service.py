@@ -80,6 +80,41 @@ def normalizar_texto(texto: str):
     texto = "".join(c for c in texto if unicodedata.category(c) != "Mn")  # quitar tildes
     return texto
 
+def contiene_alguna_fecha_en_detalle(detalle: str, fecha_inicio: datetime, fecha_fin: datetime) -> bool:
+    detalle_normalizado = normalizar_texto(detalle)
+
+    def fecha_esta(fecha: datetime):
+        dia = int(fecha.day)
+        mes_num = fecha.strftime("%m")
+        mes_nombre = MESES_ES[mes_num]
+        anio = fecha.year
+
+        patrones = [
+            rf"\b{dia}\s*de\s*{mes_nombre}\s*de\s*{anio}\b",  # 7 de abril de 2025
+            rf"\b{dia}\s*de\s*{mes_nombre}\b",
+            rf"\b{dia}\s*{mes_nombre}\b",
+            rf"\b{dia:02d}/{mes_num}/{anio}\b",
+            rf"\b{dia}/{mes_num}/{anio}\b",
+            rf"\b{dia:02d}-{mes_num}-{anio}\b",
+            rf"\b{dia}-{mes_num}-{anio}\b",
+            rf"\b{dia:02d}/{mes_num}\b",
+            rf"\b{dia}/{mes_num}\b",
+            rf"\b{dia:02d}-{mes_num}\b",
+            rf"\b{dia}-{mes_num}\b",
+        ]
+
+        match_rango = re.search(r"\bdel\s+(\d{1,2})\s+al\s+(\d{1,2})\s+(?:de\s+)?([a-zA-ZñÑ]+)", detalle_normalizado)
+        if match_rango:
+            dia_inicio = int(match_rango.group(1))
+            dia_fin = int(match_rango.group(2))
+            mes_en_texto = match_rango.group(3).lower()
+            if mes_en_texto == mes_nombre and dia_inicio <= dia <= dia_fin:
+                return True
+
+        return any(re.search(p, detalle_normalizado) for p in patrones)
+
+    return fecha_esta(fecha_inicio) or fecha_esta(fecha_fin)
+
 
 def validar_otro_si_temporal(fila, row_idx, campos_obligatorios, errores):
     fila_valida = True
@@ -135,54 +170,51 @@ def validar_otro_si_temporal(fila, row_idx, campos_obligatorios, errores):
     if detalle and isinstance(fecha_inicio, datetime) and isinstance(fecha_fin, datetime):
         detalle_normalizado = normalizar_texto(detalle)
 
-    def fecha_en_detalle(fecha: datetime):
-        dia = int(fecha.day)
-        mes_num = fecha.strftime("%m")
-        mes_nombre = MESES_ES[mes_num]
-        anio = fecha.year
+        def fecha_en_detalle(fecha: datetime):
+            dia = int(fecha.day)
+            mes_num = fecha.strftime("%m")
+            mes_nombre = MESES_ES[mes_num]
+            anio = fecha.year
 
-        patrones = [
-            rf"\b{dia}\s*de\s*{mes_nombre}\b",               # 7 de marzo
-            rf"\b{dia}\s*{mes_nombre}\b",                    # 7 marzo
-            rf"\b{dia:02d}/{mes_num}\b",                     # 07/03
-            rf"\b{dia}/{mes_num}\b",                         # 7/03
-            rf"\b{dia:02d}-{mes_num}\b",                     # 07-03
-            rf"\b{dia}-{mes_num}\b",                         # 7-03
-        ]
+            patrones = [
+                rf"\b{dia}\s*de\s*{mes_nombre}\s*de\s*{anio}\b",
+                rf"\b{dia}\s*de\s*{mes_nombre}\b",
+                rf"\b{dia}\s*{mes_nombre}\b",
+                rf"\b{dia:02d}/{mes_num}/{anio}\b",
+                rf"\b{dia}/{mes_num}/{anio}\b",
+                rf"\b{dia:02d}-{mes_num}-{anio}\b",
+                rf"\b{dia}-{mes_num}-{anio}\b",
+                rf"\b{dia:02d}/{mes_num}\b",
+                rf"\b{dia}/{mes_num}\b",
+                rf"\b{dia:02d}-{mes_num}\b",
+                rf"\b{dia}-{mes_num}\b",
+            ]
 
-        # Extra: Buscar rangos tipo "del 1 al 30 abril"
-        # e intentar deducir si fecha está en ese rango
-        match_rango = re.search(r"\bdel\s+(\d{1,2})\s+al\s+(\d{1,2})\s+(?:de\s+)?([a-zA-ZñÑ]+)", detalle_normalizado)
-        if match_rango:
-            dia_inicio = int(match_rango.group(1))
-            dia_fin = int(match_rango.group(2))
-            mes_en_texto = match_rango.group(3).lower()
+            match_rango = re.search(r"\bdel\s+(\d{1,2})\s+al\s+(\d{1,2})\s+(?:de\s+)?([a-zA-ZñÑ]+)", detalle_normalizado)
+            if match_rango:
+                dia_inicio = int(match_rango.group(1))
+                dia_fin = int(match_rango.group(2))
+                mes_en_texto = match_rango.group(3).lower()
+                if mes_en_texto == mes_nombre and dia_inicio <= dia <= dia_fin:
+                    return True
 
-            if mes_en_texto == mes_nombre and dia_inicio <= dia <= dia_fin:
-                return True
+            return any(re.search(p, detalle_normalizado) for p in patrones)
 
-        for patron in patrones:
-            if re.search(patron, detalle_normalizado):
-                return True
+        if contiene_alguna_fecha_en_detalle(detalle, fecha_inicio, fecha_fin):
+            faltan = []
+            if not fecha_en_detalle(fecha_inicio):
+                faltan.append(f"FECHA INICIO ({fecha_inicio.strftime('%d/%m/%Y')})")
+            if not fecha_en_detalle(fecha_fin):
+                faltan.append(f"FECHA FIN ({fecha_fin.strftime('%d/%m/%Y')})")
 
-        return False
-
-    faltan = []
-    if not fecha_en_detalle(fecha_inicio):
-        faltan.append(f"FECHA INICIO ({fecha_inicio.strftime('%d/%m/%Y')})")
-    if not fecha_en_detalle(fecha_fin):
-        faltan.append(f"FECHA FIN ({fecha_fin.strftime('%d/%m/%Y')})")
-
-    if faltan:
-        errores.append(
-            f"❌ Fila {row_idx}, Columna {detalle_idx + 1} (DETALLE NOVEDAD): El detalle no contiene {', '.join(faltan)}. "
-            f"Se asume que si no se especifica el año, se refiere a {fecha_inicio.year}. "
-            f"Texto actual: \"{detalle}\""
-        )
-        fila_valida = False
+            if faltan:
+                errores.append(
+                    f"❌ Fila {row_idx}, Columna {detalle_idx + 1} (DETALLE NOVEDAD): Las fechas en las columnas 'FECHA INICIO' y 'FECHA FIN' no coinciden con lo que escribiste en el detalle. "
+                    f"Verifica que las fechas en las columnas estén bien escritas. Fechas esperadas: {', '.join(faltan)}"
+                )
+                fila_valida = False
 
 
-    
     #VALIDAR SALARIOS
     salario_actual_idx = campos_obligatorios.get("SALARIO ACTUAL")
     salario_otro_si_temp_idx = campos_obligatorios.get("SALARIO OTRO SI TEMPORAL")
