@@ -2,6 +2,8 @@ export function getMensajePorEstadoBackendPorId(
   idEstado: number,
   esNomina: boolean,
 ): string {
+  console.log('🔍 getMensajePorEstadoBackendPorId → esNomina:', esNomina);
+
   if (esNomina) {
     switch (idEstado) {
       case 1: // 'PENDIENTE' para Nómina

@@ -28,6 +28,7 @@ interface AuthenticatedRequest extends Request {
     correo: string;
     id_usuario: number;
     esJefe: boolean;
+    esNomina: boolean;
     nombreTienda: string;
   };
 }
@@ -211,7 +212,7 @@ export class ArchivoAdjuntoController {
 
       const idTipoNovedad = mapaTiposNovedad[titulo] ?? null;
 
-      const mensaje = getMensajePorEstadoBackendPorId(1, req.user.esJefe);
+      const mensaje = getMensajePorEstadoBackendPorId(1, req.user.esNomina);
 
       const novedad = await this.novedadService.crearNovedad({
         idUsuario: req.user.id_usuario,
