@@ -57,24 +57,21 @@ model notificacion {
 }
 
 model novedad {
-  id_novedad        Int                 @id @default(autoincrement())
-  id_usuario        Int?
-  id_tipo_novedad   Int?
-  id_estado_novedad Int?
-  fecha_creacion    DateTime?           @default(now()) @db.Timestamp(6)
-  descripcion       String?
-  archivo_adjunto   archivo_adjunto[]
-  historial_novedad historial_novedad[]
-  notificacion      notificacion[]
-   // NUEVOS CAMPOS
-  es_masiva           Boolean  @default(false)
-  cantidad_solicitudes Int?     // solo si es masiva
-  
-  estado_novedad    estado_novedad?     @relation(fields: [id_estado_novedad], references: [id_estado_novedad], onUpdate: NoAction)
-  tipo_novedad      tipo_novedad?       @relation(fields: [id_tipo_novedad], references: [id_tipo_novedad], onUpdate: NoAction)
-  usuario           usuario?            @relation(fields: [id_usuario], references: [id_usuario], onUpdate: NoAction)
-
-  detallesMasivos DetalleNovedadMasiva[]
+  id_novedad           Int                    @id @default(autoincrement())
+  id_usuario           Int?
+  id_tipo_novedad      Int?
+  id_estado_novedad    Int?
+  fecha_creacion       DateTime?              @default(now()) @db.Timestamp(6)
+  descripcion          String?
+  cantidad_solicitudes Int?
+  es_masiva            Boolean                @default(false)
+  archivo_adjunto      archivo_adjunto[]
+  detalles             DetalleNovedadMasiva[]
+  historial_novedad    historial_novedad[]
+  notificacion         notificacion[]
+  estado_novedad       estado_novedad?        @relation(fields: [id_estado_novedad], references: [id_estado_novedad], onUpdate: NoAction)
+  tipo_novedad         tipo_novedad?          @relation(fields: [id_tipo_novedad], references: [id_tipo_novedad], onUpdate: NoAction)
+  usuario              usuario?               @relation(fields: [id_usuario], references: [id_usuario], onUpdate: NoAction)
 }
 
 model rol {
@@ -98,7 +95,7 @@ model usuario {
   notificacion      notificacion[]
   novedad           novedad[]
   usuario_rol       usuario_rol[]
-  usuario_tienda    usuario_tienda[] 
+  usuario_tienda    usuario_tienda[]
 }
 
 model usuario_rol {
@@ -111,54 +108,51 @@ model usuario_rol {
 }
 
 model tienda {
-  id_tienda      Int             @id @default(autoincrement())
-  nombre_tienda  String          @db.VarChar(100)
+  id_tienda      Int              @id @default(autoincrement())
+  nombre_tienda  String           @db.VarChar(100)
   usuario_tienda usuario_tienda[]
 }
 
 model usuario_tienda {
   id_usuario Int
   id_tienda  Int
-  usuario    usuario @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
   tienda     tienda  @relation(fields: [id_tienda], references: [id_tienda], onDelete: Cascade)
+  usuario    usuario @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
 
   @@id([id_usuario, id_tienda])
 }
 
 model DetalleNovedadMasiva {
-  id_detalle               Int      @id @default(autoincrement())
+  id_detalle               Int       @id(map: "detalle_novedad_masiva_pkey1") @default(autoincrement())
   id_novedad               Int
-  novedad                  novedad  @relation(fields: [id_novedad], references: [id_novedad], onDelete: Cascade)
-
   n                        Int?
-  fecha                    DateTime?
-  cedula                   String?
-  nombre                   String?
-  categoria                String?
-  tienda                   String?
-  jefe                    String?
-  detalle                  String?
-  jornada_empleado         String?
-  jornada_otro_si          String?
-  fecha_inicio             DateTime?
-  fecha_fin                DateTime?
+  fecha                    DateTime? @db.Timestamp(6)
+  cedula                   Int?
+  nombre                   String?   @db.VarChar
+  categoria                String?   @db.VarChar
+  tienda                   String?   @db.VarChar
+  jefe                     String?   @db.VarChar
+  detalle                  String?   @db.VarChar
+  jornada_empleado         String?   @db.VarChar
+  jornada_otro_si          String?   @db.VarChar
+  fecha_inicio             DateTime? @db.Timestamp(6)
+  fecha_fin                DateTime? @db.Timestamp(6)
   salario_actual           Float?
   salario_otro_si          Float?
-  consecutivo_forms        String?
-  concepto                 String?
-  codigo_concepto          String?
+  consecutivo_forms        String?   @db.VarChar
+  concepto                 String?   @db.VarChar
+  codigo_concepto          Int?
   unidades                 Int?
-  fecha_novedad            DateTime?
-  fecha_inicio_disfrute    DateTime?
-  fecha_fin_disfrute       DateTime?
-
-  // Campos a llenar por Nómina más adelante
-  responsable_validacion   String?  @default("")
-  respuesta_validacion     String?  @default("")
-  ajuste                   String?  @default("")
-  fecha_pago               DateTime?
-  area_responsable         String?  @default("")
-  categoria_inconsistencia String?  @default("")
+  fecha_novedad            DateTime? @db.Timestamp(6)
+  fecha_inicio_disfrute    DateTime? @db.Timestamp(6)
+  fecha_fin_disfrute       DateTime? @db.Timestamp(6)
+  responsable_validacion   String?   @default("") @db.VarChar
+  respuesta_validacion     String?   @default("") @db.VarChar
+  ajuste                   String?   @default("") @db.VarChar
+  fecha_pago               DateTime? @db.Timestamp(6)
+  area_responsable         String?   @default("") @db.VarChar
+  categoria_inconsistencia String?   @default("") @db.VarChar
+  novedad                  novedad   @relation(fields: [id_novedad], references: [id_novedad], onDelete: Cascade, onUpdate: NoAction, map: "fk_novedad")
 
   @@map("detalle_novedad_masiva")
 }

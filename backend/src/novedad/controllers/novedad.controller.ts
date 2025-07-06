@@ -282,7 +282,7 @@ export class NovedadController {
 
   @Get('validar-duplicado')
   async validarDuplicado(
-    @Query('cedula') cedula: string,
+    @Query('cedula') cedula: number,
     @Query('fecha') fecha: string,
     @Query('tipo') tipo: string,
   ) {

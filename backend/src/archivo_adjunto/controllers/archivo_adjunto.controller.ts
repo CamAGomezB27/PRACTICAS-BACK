@@ -52,7 +52,7 @@ interface FilaParaExportar {
   id: number;
   numero: number;
   fecha: string;
-  cedula: string;
+  cedula: number;
   nombre: string;
   categoria: string;
   tienda: string;

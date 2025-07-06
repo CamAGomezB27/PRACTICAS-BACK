@@ -575,10 +575,12 @@ export class NovedadeService {
   async obtenerDetallesPendientesParaNomina(filtros: FiltrosParaNomina = {}) {
     const whereCondition: Record<string, any> = {
       novedad: {
-        estado_novedad: {
-          nombre_estado: {
-            equals: 'CREADA', // o 'PENDIENTE' si así está en la BD
-            mode: 'insensitive',
+        is: {
+          estado_novedad: {
+            nombre_estado: {
+              equals: 'CREADA', // o 'PENDIENTE' si así está en la BD
+              mode: 'insensitive',
+            },
           },
         },
       },
@@ -714,7 +716,7 @@ export class NovedadeService {
 
   // Método alternativo MÁS ROBUSTO (recomendado usar este)
   async existeDuplicadoRobusto(input: {
-    cedula: string;
+    cedula: number;
     tipo: string;
     fecha: string; // '2025-07-03 05:00:00'
   }): Promise<boolean> {
@@ -736,7 +738,7 @@ export class NovedadeService {
       );
 
       const where: Prisma.DetalleNovedadMasivaWhereInput = {
-        cedula: input.cedula,
+        cedula: input.cedula ?? undefined,
         categoria: input.tipo,
         fecha: fechaExacta, // esto crea un Date válido para Prisma
       };
@@ -751,7 +753,7 @@ export class NovedadeService {
 
       const resultado = await this.prisma.detalleNovedadMasiva.findFirst({
         where: {
-          cedula: input.cedula,
+          cedula: Number(input.cedula),
           categoria: input.tipo,
           fecha: {
             gte: fechaDesde,

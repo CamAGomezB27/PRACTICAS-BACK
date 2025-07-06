@@ -10,7 +10,7 @@ import { PrismaService } from 'prisma/prisma.service';
 
 interface Solicitud {
   fecha: Date | string;
-  cedula: string;
+  cedula: number;
   nombre: string;
   categoria: string;
   tienda: string;
@@ -29,7 +29,7 @@ export interface SolicitudConIdDetalle extends Solicitud {
   salario_otro_si: number;
   consecutivo_forms: string;
   concepto: string;
-  codigo_concepto: string;
+  codigo_concepto: number;
   unidades: number;
   fecha_novedad: Date | null;
   fecha_inicio_disfrute: Date | null;
@@ -46,6 +46,11 @@ type RespuestaMicroservicio =
   | { valido: true; esMasiva: boolean; cantidadSolicitudes: number }
   | { valido: false; errores: string[] };
 
+type FilaDB = Omit<
+  Prisma.DetalleNovedadMasivaUncheckedCreateInput,
+  'id_detalle'
+>;
+
 export interface ResultadoValidacion {
   valido: boolean;
   errores?: string[];
@@ -56,7 +61,7 @@ interface FilaParaExportar {
   id: number;
   numero: number;
   fecha: string;
-  cedula: string;
+  cedula: number;
   nombre: string;
   categoria: string;
   tienda: string;
@@ -305,6 +310,28 @@ export class ArchivoAdjuntoService {
     }
   }
 
+  private asignarValorSeguro(
+    fila: FilaDB,
+    key: keyof FilaDB,
+    valor: unknown,
+  ): void {
+    const ref = fila as Record<string, unknown>;
+
+    if (key.includes('fecha')) {
+      ref[key] = this.convertirAFecha(valor);
+    } else if (['n', 'unidades'].includes(key)) {
+      ref[key] = this.convertirAEntero(valor) ?? 0;
+    } else if (['salario_actual', 'salario_otro_si'].includes(key)) {
+      ref[key] = this.convertirANumero(valor) ?? 0;
+    } else if (typeof valor === 'string') {
+      ref[key] = valor.trim();
+    } else if (typeof valor === 'number' || typeof valor === 'boolean') {
+      ref[key] = valor;
+    } else {
+      ref[key] = '';
+    }
+  }
+
   async procesarYGuardarExcel(
     buffer: Buffer,
     id_novedad: number,
@@ -312,50 +339,132 @@ export class ArchivoAdjuntoService {
     try {
       const workbook = new Workbook();
       await workbook.xlsx.load(buffer);
+      console.log('✅ Archivo Excel cargado correctamente');
+
       const sheet = workbook.getWorksheet(1);
+      if (!sheet) throw new Error('❌ No se pudo acceder a la hoja de Excel.');
+      console.log('✅ Hoja de Excel obtenida:', sheet.name);
 
-      if (!sheet) {
-        throw new Error('No se pudo acceder a la hoja de Excel.');
-      }
+      const filas: FilaDB[] = [];
 
-      const filas: Omit<
-        Prisma.DetalleNovedadMasivaUncheckedCreateInput,
-        'id_detalle'
-      >[] = [];
+      const encabezadosToCamposBD: Record<string, keyof FilaDB> = {
+        N: 'n',
+        'FECHA DE REPORTE': 'fecha',
+        CEDULA: 'cedula',
+        'NOMBRE (Apellidos-Nombres)': 'nombre',
+        CATEGORIA: 'categoria',
+        TIENDA: 'tienda',
+        'QUIEN REPORTA LA NOVEDAD\n(Nombre Jefe GH)': 'jefe',
+        'DETALLE NOVEDAD': 'detalle',
+        'JORNADA EMPLEADO': 'jornada_empleado',
+        'JORNADA OTRO SI TEMPORAL': 'jornada_otro_si',
+        'FECHA INICIO': 'fecha_inicio',
+        'FECHA FIN': 'fecha_fin',
+        'SALARIO ACTUAL': 'salario_actual',
+        'SALARIO OTRO SI TEMPORAL': 'salario_otro_si',
+        'CONSECUTIVO FORMS': 'consecutivo_forms',
+        CONCEPTO: 'concepto',
+        CON_CODIGO: 'codigo_concepto',
+        UNIDADES: 'unidades',
+        'FECHA NOVEDAD': 'fecha_novedad',
+        'FECHA INICIO DISFRUTE': 'fecha_inicio_disfrute',
+        'FECHA FIN DISFRUTE': 'fecha_fin_disfrute',
+        'RESPONSABLE VALIDACIÓN': 'responsable_validacion',
+        'RESPUESTA RESULTADO DE VALIDACIÓN': 'respuesta_validacion',
+        'AJUSTE SI/NO': 'ajuste',
+        'FECHA DE AJUSTE/PAGO': 'fecha_pago',
+        'ÁREA RESPONSABLE INCONSISTENCIA / ACLARACIÓN': 'area_responsable',
+        'CATEGORIA GENERAL INCONSISTENCIA': 'categoria_inconsistencia',
+      };
 
-      // Procesar filas desde la 6 hasta la última con datos
+      const headerRow = sheet.getRow(5);
+      const headerMap: Record<string, number> = {};
+
+      headerRow.eachCell((cell, colNumber) => {
+        const texto = typeof cell.value === 'string' ? cell.value.trim() : '';
+        const campoBD = encabezadosToCamposBD[texto];
+        if (campoBD) {
+          headerMap[campoBD] = colNumber;
+          console.log(
+            `📌 Encabezado "${texto}" mapeado a "${campoBD}" en columna ${colNumber}`,
+          );
+        }
+      });
+
+      console.log('🧠 Mapa completo de encabezados:', headerMap);
+
       for (let rowIndex = 6; rowIndex <= sheet.rowCount; rowIndex++) {
         const row = sheet.getRow(rowIndex);
+        if (!this.tieneContenido(row)) continue;
 
-        if (!row || !this.tieneContenido(row)) {
-          continue;
+        console.log(`📄 Procesando fila ${rowIndex}`);
+
+        const fila: FilaDB = {
+          id_novedad,
+          n: 0,
+          fecha: null,
+          cedula: null,
+          nombre: '-',
+          categoria: '-',
+          tienda: '-',
+          jefe: '-',
+          detalle: '-',
+          jornada_empleado: '-',
+          jornada_otro_si: '-',
+          fecha_inicio: null,
+          fecha_fin: null,
+          salario_actual: 0,
+          salario_otro_si: 0,
+          consecutivo_forms: '-',
+          concepto: '-',
+          codigo_concepto: null,
+          unidades: 0,
+          fecha_novedad: null,
+          fecha_inicio_disfrute: null,
+          fecha_fin_disfrute: null,
+          responsable_validacion: '',
+          respuesta_validacion: '',
+          ajuste: '',
+          fecha_pago: null,
+          area_responsable: '',
+          categoria_inconsistencia: '',
+        };
+
+        for (const [campoBD, colIndex] of Object.entries(headerMap)) {
+          const key = campoBD as keyof FilaDB;
+          const valor = row.getCell(colIndex)?.value ?? '';
+
+          console.log(`🔍 Fila ${rowIndex} - ${campoBD} (${colIndex}):`, valor);
+          this.asignarValorSeguro(fila, key, valor);
         }
 
-        const filaData = this.procesarFila(row, id_novedad);
-        if (filaData) {
-          filas.push(filaData);
-        }
+        console.log(`✅ Fila ${rowIndex} armada:`, fila);
+
+        filas.push(fila);
       }
 
       if (filas.length === 0) {
         throw new Error('El archivo no contiene filas válidas para importar.');
       }
 
-      // Guardar en la base de datos
+      console.log('💾 Total de filas a guardar:', filas.length);
+
       await this.prisma.detalleNovedadMasiva.createMany({
         data: filas,
-        skipDuplicates: true, // Evitar duplicados
+        skipDuplicates: true,
       });
+
+      console.log('✅ Datos guardados en la base de datos.');
 
       for (const fila of filas) {
         console.log('🧪 Fecha lista para guardar:', fila.fecha);
       }
 
-      console.log(`Se procesaron ${filas.length} filas correctamente`);
+      console.log(`🎉 Se procesaron ${filas.length} filas correctamente`);
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : 'Error desconocido';
-      console.error('Error procesando Excel:', error);
+      console.error('❌ Error procesando Excel:', error);
       throw new Error(`Error al procesar el archivo: ${errorMessage}`);
     }
   }
@@ -386,50 +495,6 @@ export class ArchivoAdjuntoService {
 
       return true;
     });
-  }
-
-  private procesarFila(
-    row: Row,
-    id_novedad: number,
-  ): Omit<
-    Prisma.DetalleNovedadMasivaUncheckedCreateInput,
-    'id_detalle'
-  > | null {
-    try {
-      return {
-        id_novedad,
-        n: this.convertirAEntero(row.getCell('A').value) ?? 0,
-        fecha: this.convertirAFecha(row.getCell('B').value),
-        cedula: this.getCellValue(row, 'C') || '-',
-        nombre: this.getCellValue(row, 'D') || '-',
-        categoria: this.getCellValue(row, 'E') || '-',
-        tienda: this.getCellValue(row, 'F') || '-',
-        jefe: this.getCellValue(row, 'G') || '-',
-        detalle: this.getCellValue(row, 'H') || '-',
-        jornada_empleado: this.getCellValue(row, 'I') || '-',
-        jornada_otro_si: this.getCellValue(row, 'J') || '-',
-        fecha_inicio: this.convertirAFecha(row.getCell('K').value),
-        fecha_fin: this.convertirAFecha(row.getCell('L').value),
-        salario_actual: this.convertirANumero(row.getCell('M').value) ?? 0,
-        salario_otro_si: this.convertirANumero(row.getCell('N').value) ?? 0,
-        consecutivo_forms: this.getCellValue(row, 'O') || '-',
-        concepto: this.getCellValue(row, 'P') || '-',
-        codigo_concepto: this.getCellValue(row, 'Q') || '-',
-        unidades: this.convertirAEntero(row.getCell('R').value) ?? 0,
-        fecha_novedad: this.convertirAFecha(row.getCell('S').value),
-        fecha_inicio_disfrute: this.convertirAFecha(row.getCell('T').value),
-        fecha_fin_disfrute: this.convertirAFecha(row.getCell('U').value),
-        responsable_validacion: '',
-        respuesta_validacion: '',
-        ajuste: '',
-        fecha_pago: null,
-        area_responsable: '',
-        categoria_inconsistencia: '',
-      };
-    } catch (error) {
-      console.error(`Error procesando fila ${row.number}:`, error);
-      return null;
-    }
   }
 
   private convertirAFecha(valor: unknown): Date | null {
@@ -583,20 +648,20 @@ export class ArchivoAdjuntoService {
     }
   }
 
-  // // Helpers de “seguridad” para cada tipo
-  // private safeString(v: string | null | undefined): string {
-  //   return v && v.trim() !== '' ? v : 'NO APLICA';
-  // }
+  // Helpers de “seguridad” para cada tipo
+  private safeString(v: string | null | undefined): string {
+    return v && v.trim() !== '' ? v : 'NO APLICA';
+  }
 
-  // private safeDate(v: Date | string | null | undefined): string {
-  //   if (!v) return '-';
-  //   const d = typeof v === 'string' ? new Date(v) : v;
-  //   return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('es-CO');
-  // }
+  private safeDate(v: Date | string | null | undefined): string {
+    if (!v) return '-';
+    const d = typeof v === 'string' ? new Date(v) : v;
+    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('es-CO');
+  }
 
-  // private safeNumber(v: number | null | undefined): number {
-  //   return typeof v === 'number' && !isNaN(v) ? v : 0;
-  // }
+  private safeNumber(v: number | null | undefined): number {
+    return typeof v === 'number' && !isNaN(v) ? v : 0;
+  }
 
   async generarConsolidadoPostNomina(
     solicitudes: SolicitudConIdDetalle[],
@@ -786,7 +851,10 @@ export class ArchivoAdjuntoService {
         salario_otro_si: s.salario_otro_si ?? 0,
         consecutivo_forms: s.consecutivo_forms ?? '',
         concepto: s.concepto ?? '',
-        codigo_concepto: s.codigo_concepto ?? '',
+        codigo_concepto:
+          typeof s.codigo_concepto === 'string'
+            ? parseInt(s.codigo_concepto) || 0
+            : (s.codigo_concepto ?? 0),
         unidades: s.unidades ?? 0,
         responsable_validacion: s.responsable_validacion ?? '',
         respuesta_validacion: s.respuesta_validacion ?? '',
@@ -794,7 +862,12 @@ export class ArchivoAdjuntoService {
         area_responsable: s.area_responsable ?? '',
         categoria_inconsistencia: s.categoria_inconsistencia ?? '',
         detalle: s.detalle ?? '',
-        cedula: s.cedula ?? '',
+        cedula:
+          typeof s.cedula === 'string'
+            ? parseInt(s.cedula)
+            : s.cedula !== null && s.cedula !== undefined
+              ? s.cedula
+              : 0,
         nombre: s.nombre ?? '',
         categoria: s.categoria ?? '',
         tienda: s.tienda ?? '',
