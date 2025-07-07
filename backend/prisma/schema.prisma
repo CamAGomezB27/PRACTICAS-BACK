@@ -91,12 +91,18 @@ model usuario {
   id_usuario        Int                 @id @default(autoincrement())
   nombre            String              @db.VarChar(100)
   correo            String              @unique @db.VarChar(100)
+  estado            Boolean             @default(true)                   // activo por defecto
+  fecha_creacion    DateTime            @default(now())                 // se guarda al crear
+  ultima_actividad  DateTime? // Nueva
+  ip_ultima_conexion String? // Nueva
+  ubicacion          String? // Nueva (ej: "Bogotá, CO")
   historial_novedad historial_novedad[]
   notificacion      notificacion[]
   novedad           novedad[]
   usuario_rol       usuario_rol[]
   usuario_tienda    usuario_tienda[]
 }
+
 
 model usuario_rol {
   id_usuario Int

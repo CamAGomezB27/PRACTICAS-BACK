@@ -1,8 +1,16 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import axios from 'axios';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ConfigService } from '@nestjs/config';
+
+interface GeoLocationResponse {
+  status: 'success' | 'fail';
+  country: string;
+  regionName: string;
+  city: string;
+  query: string; // IP
+}
 
 interface GoogleUser {
   email: string;
@@ -74,15 +82,50 @@ export class AuthService {
     }
   }
 
-  async loginWithGoogle(googleToken: string) {
+  async getUbicacionDesdeIP(ip: string): Promise<string> {
+    try {
+      const response = await axios.get<GeoLocationResponse>(
+        `http://ip-api.com/json/${ip}`,
+      );
+      const data: GeoLocationResponse = response.data;
+
+      if (data.status === 'success') {
+        return `${data.city}, ${data.country}`;
+      } else {
+        return 'Ubicación desconocida';
+      }
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.warn('No se pudo obtener la ubicación por IP:', error.message);
+      } else {
+        console.warn(
+          'No se pudo obtener la ubicación por IP:',
+          JSON.stringify(error),
+        );
+      }
+      return 'Ubicación desconocida';
+    }
+  }
+
+  async loginWithGoogle(googleToken: string, ip: string) {
     const googleUser = await this.validateGoogleToken(googleToken);
     const user = await this.prisma.usuario.findUnique({
       where: { correo: googleUser.email },
     });
 
-    if (!user) {
+    if (!user)
       throw new HttpException('Usuario no encontrado', HttpStatus.NOT_FOUND);
-    }
+
+    const ubicacion = await this.getUbicacionDesdeIP(ip);
+
+    await this.prisma.usuario.update({
+      where: { id_usuario: user.id_usuario },
+      data: {
+        ultima_actividad: new Date(),
+        ip_ultima_conexion: ip.toString(),
+        ubicacion,
+      },
+    });
 
     const userRole = await this.prisma.usuario_rol.findFirst({
       where: { id_usuario: user.id_usuario },

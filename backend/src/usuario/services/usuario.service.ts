@@ -9,6 +9,33 @@ interface CrearUsuarioInput {
   tienda?: string;
 }
 
+type UsuarioConRelaciones = {
+  id_usuario: number;
+  nombre: string;
+  correo: string;
+  estado: boolean;
+  fecha_creacion: Date;
+  ultima_actividad: Date | null; // 👈 nuevo
+  ip_ultima_conexion: string | null; // 👈 nuevo
+  ubicacion: string | null; // 👈 nuevo
+  usuario_rol: {
+    id_usuario: number;
+    id_rol: number;
+    rol: {
+      id_rol: number;
+      nombre_rol: string;
+    };
+  }[];
+  usuario_tienda: {
+    id_usuario: number;
+    id_tienda: number;
+    tienda: {
+      id_tienda: number;
+      nombre_tienda: string;
+    };
+  }[];
+};
+
 @Injectable()
 export class UsuarioService {
   constructor(private prisma: PrismaService) {}
@@ -153,5 +180,41 @@ export class UsuarioService {
       roles,
       tiendas,
     };
+  }
+
+  async listarUsuarios() {
+    const usuarios = (await this.prisma.usuario.findMany({
+      include: {
+        usuario_rol: {
+          include: {
+            rol: true,
+          },
+        },
+        usuario_tienda: {
+          include: {
+            tienda: true,
+          },
+        },
+      },
+    })) as UsuarioConRelaciones[];
+
+    return usuarios.map((u) => {
+      const rol = u.usuario_rol[0]?.rol?.nombre_rol || 'Sin rol';
+      const tienda = u.usuario_tienda[0]?.tienda?.nombre_tienda || null;
+
+      return {
+        nombre: u.nombre,
+        correo: u.correo,
+        rol,
+        estado: u.estado ? 'Activo' : 'Inactivo',
+        fecha_creacion: u.fecha_creacion.toISOString().split('T')[0],
+        tienda,
+        ultima_actividad: u.ultima_actividad
+          ? u.ultima_actividad.toISOString()
+          : null,
+        ip_ultima_conexion: u.ip_ultima_conexion || null,
+        ubicacion: u.ubicacion || null,
+      };
+    });
   }
 }

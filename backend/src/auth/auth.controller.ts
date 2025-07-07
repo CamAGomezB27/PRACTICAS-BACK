@@ -1,17 +1,17 @@
 import {
-  Controller,
-  Post,
   Body,
-  Res,
+  Controller,
   Get,
-  UseGuards,
+  Post,
   Req,
+  Res,
+  UseGuards,
 } from '@nestjs/common';
-import { AuthService } from './auth.service';
-import { Response } from 'express';
-import { JwtAuthGuard } from './jwt-auth.guard';
-import { UsuarioService } from 'src/usuario/services/usuario.service';
+import { Request, Response } from 'express';
 import { PrismaService } from 'prisma/prisma.service';
+import { UsuarioService } from 'src/usuario/services/usuario.service';
+import { AuthService } from './auth.service';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -41,9 +41,16 @@ export class AuthController {
   @Post('google')
   async loginWithGoogle(
     @Body('token') googleToken: string,
+    @Req() req: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const { token, user } = await this.authService.loginWithGoogle(googleToken);
+    const ipRaw = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const ip = Array.isArray(ipRaw) ? ipRaw[0] : (ipRaw ?? '');
+
+    const { token, user } = await this.authService.loginWithGoogle(
+      googleToken,
+      ip,
+    );
 
     response.cookie('jwt', token, {
       httpOnly: true,

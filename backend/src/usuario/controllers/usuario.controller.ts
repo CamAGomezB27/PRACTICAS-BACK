@@ -2,29 +2,42 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { UsuarioService } from '../services/usuario.service';
 
+interface CrearUsuarioInput {
+  nombre: string;
+  correo: string;
+  rol: string;
+  tienda?: string; // solo si aplica
+}
+
 @Controller('usuario')
 export class UsuarioController {
   constructor(private readonly usuarioService: UsuarioService) {}
 
-  // Verifica si un correo ya está registrado
-  @Get(':email/validar')
-  async validarEmail(@Param('email') email: string) {
-    return this.usuarioService.validarEmail(email);
+  // Crear usuario
+  @Post()
+  async crearUsuario(@Body() body: CrearUsuarioInput) {
+    return this.usuarioService.crearUsuario(body);
   }
 
-  // Obtener usuario por ID
+  //todos los usuarios
+  @Get('listar')
+  async listarUsuarios() {
+    return this.usuarioService.listarUsuarios();
+  }
+
+  //  Obtener usuario por ID
   @Get(':id')
   async findByID(@Param('id') id: string) {
     return this.usuarioService.findById(+id);
   }
 
-  // Crear un nuevo usuario
-  @Post()
-  async crearUsuario(@Body() body: any) {
-    return this.usuarioService.crearUsuario(body); // <-- Quitamos el punto que estaba mal
+  // Verificar si email ya existe
+  @Get(':email/validar')
+  async validarEmail(@Param('email') email: string) {
+    return this.usuarioService.validarEmail(email);
   }
 
-  // Obtener lista de roles
+  // Obtener roles y tiendas
   @Get()
   async obtenerRolesYTiendas() {
     return this.usuarioService.obtenerRolesYTiendas();
