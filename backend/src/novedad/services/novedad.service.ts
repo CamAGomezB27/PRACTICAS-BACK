@@ -21,14 +21,6 @@ interface FiltrosParaNomina {
   estado?: string;
 }
 
-// interface DetalleNovedadMasiva {
-//   id_detalle: number;
-//   fecha: string;
-//   cedula: string;
-//   categoria: string;
-//   detalle: string;
-// }
-
 @Injectable()
 export class NovedadeService {
   constructor(private prisma: PrismaService) {}
@@ -149,6 +141,7 @@ export class NovedadeService {
         codigo_concepto: true,
         unidades: true,
         fecha_novedad: true,
+        dias_a_tomar: true,
         fecha_inicio_disfrute: true,
         fecha_fin_disfrute: true,
         responsable_validacion: true,
@@ -275,6 +268,7 @@ export class NovedadeService {
         codigo_concepto: true,
         unidades: true,
         fecha_novedad: true,
+        dias_a_tomar: true,
         fecha_inicio_disfrute: true,
         fecha_fin_disfrute: true,
         responsable_validacion: true,
@@ -479,6 +473,7 @@ export class NovedadeService {
         codigo_concepto: true,
         unidades: true,
         fecha_novedad: true,
+        dias_a_tomar: true,
         fecha_inicio_disfrute: true,
         fecha_fin_disfrute: true,
         responsable_validacion: true,
@@ -659,6 +654,7 @@ export class NovedadeService {
         codigo_concepto: true,
         unidades: true,
         fecha_novedad: true,
+        dias_a_tomar: true,
         fecha_inicio_disfrute: true,
         fecha_fin_disfrute: true,
         responsable_validacion: true,
