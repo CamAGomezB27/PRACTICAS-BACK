@@ -150,6 +150,7 @@ model DetalleNovedadMasiva {
   codigo_concepto          Int?
   unidades                 Int?
   fecha_novedad            DateTime? @db.Timestamp(6)
+  dias_a_tomar             Int?
   fecha_inicio_disfrute    DateTime? @db.Timestamp(6)
   fecha_fin_disfrute       DateTime? @db.Timestamp(6)
   responsable_validacion   String?   @default("") @db.VarChar

@@ -7,6 +7,11 @@ import openpyxl.utils
 from fastapi import Header
 import unicodedata
 import re
+import holidays
+from datetime import timedelta
+
+CO_HOLIDAYS = holidays.CO()
+
 
 
 TIPOS_PERMITIDOS = {
@@ -249,11 +254,70 @@ def validar_otro_si_temporal(fila, row_idx, campos_obligatorios, errores):
         fila_valida = False
     
     return fila_valida
+
+#DIAS HABILES EN COLOMBIA
+def es_dia_habil(date: datetime) -> bool:
+    return date.weekday() < 5 and date.date() not in CO_HOLIDAYS
+
+#CONTAR LOS DIAS HABILES EN COLOMBIA DE ACUERDO A LO INDICADO EN EL ARCHIVO
+def contar_dias_habiles(inicio: datetime, fin: datetime) -> int:
+    dias = 0
+    actual = inicio
+    while actual <= fin:
+        if es_dia_habil(actual):
+            dias += 1
+        actual += timedelta(days=1)
+    return dias
+
+def validar_vacaciones(fila, row_idx, campos_obligatorios, errores):
+    fila_valida = True
+
+    dias_tomar_idx = campos_obligatorios.get("DIAS A TOMAR")
+    fecha_inicio_disfrute_idx = campos_obligatorios.get("FECHA INICIO DISFRUTE")
+    fecha_fin_disfrute_idx = campos_obligatorios.get("FECHA FIN DISFRUTE")
+
+    if dias_tomar_idx is None or fecha_inicio_disfrute_idx is None or fecha_fin_disfrute_idx is None:
+        errores.append(f"❌ Fila {row_idx}: Faltan columnas requeridas para vacaciones.")
+        return False
+
+    # Obtener valores
+    try:
+        dias_tomar = int(fila[dias_tomar_idx].value)
+    except:
+        errores.append(f"❌ Fila {row_idx}, Columna {dias_tomar_idx+1} (DIAS A TOMAR): debe ser un número entero.")
+        fila_valida = False
+        dias_tomar = None
+
+    fecha_inicio = normalizar_fecha(fila[fecha_inicio_disfrute_idx].value)
+    fecha_fin = normalizar_fecha(fila[fecha_fin_disfrute_idx].value)
+
+    if not isinstance(fecha_inicio, datetime):
+        errores.append(f"❌ Fila {row_idx}, Columna {fecha_inicio_disfrute_idx+1} (FECHA INICIO): debe ser una fecha válida.")
+        fila_valida = False
+
+    if not isinstance(fecha_fin, datetime):
+        errores.append(f"❌ Fila {row_idx}, Columna {fecha_fin_disfrute_idx+1} (FECHA FIN): debe ser una fecha válida.")
+        fila_valida = False
+
+    if dias_tomar and fecha_inicio and fecha_fin:
+        if fecha_inicio > fecha_fin:
+            errores.append(f"❌ Fila {row_idx}: La FECHA INICIO no puede ser posterior a la FECHA FIN.")
+            fila_valida = False
+        else:
+            dias_habiles = contar_dias_habiles(fecha_inicio, fecha_fin)
+            if dias_habiles != dias_tomar:
+                errores.append(
+                    f"❌ Fila {row_idx}: Los días hábiles entre {fecha_inicio.strftime('%d/%m/%Y')} y {fecha_fin.strftime('%d/%m/%Y')} son {dias_habiles}, pero se indicó {dias_tomar}."
+                )
+                fila_valida = False
+
+    return fila_valida
         
 
 VALIDACIONES_ESPECIALES = {
     "Horas Extra": validar_horas_extra,
     "Otro Si Temporal": validar_otro_si_temporal,
+    "Vacaciones": validar_vacaciones,
 }
 
 def normalizar_fecha(fecha_raw):
@@ -360,7 +424,7 @@ async def validar_excel(
         "SOLICITUDES4.xlsx": [
             "N", "FECHA DE REPORTE", "CEDULA", "NOMBRE (APELLIDOS-NOMBRES)",
             "CATEGORIA", "TIENDA", "QUIEN REPORTA LA NOVEDAD\n(Nombre Jefe GH)", "DETALLE NOVEDAD",
-            "DIAS A TOMAR", "FECHA INICIO", "FECHA FIN"
+            "DIAS A TOMAR", "FECHA INICIO DISFRUTE", "FECHA FIN DISFRUTE"
         ]
     }
     
@@ -379,7 +443,7 @@ async def validar_excel(
         ],
         "SOLICITUDES4.xlsx": [
             "CEDULA", "NOMBRE (APELLIDOS-NOMBRES)", "DETALLE NOVEDAD",
-            "DIAS A TOMAR", "FECHA INICIO", "FECHA FIN"
+            "DIAS A TOMAR", "FECHA INICIO DISFRUTE", "FECHA FIN DISFRUTE"
         ]
     }
 

@@ -70,6 +70,7 @@ interface FilaParaExportar {
   codigo: number;
   unidades: number;
   fechaNove: string;
+  diasATomar: number;
   fechInicioDisfrute: string;
   fechaFinDisfrute: string;
   ResponsableValidacion: string;

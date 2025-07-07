@@ -32,6 +32,7 @@ export interface SolicitudConIdDetalle extends Solicitud {
   codigo_concepto: number;
   unidades: number;
   fecha_novedad: Date | null;
+  dias_a_tomar: number;
   fecha_inicio_disfrute: Date | null;
   fecha_fin_disfrute: Date | null;
   responsable_validacion: string;
@@ -78,6 +79,7 @@ interface FilaParaExportar {
   codigo: number;
   unidades: number;
   fechaNove: string;
+  diasATomar: number;
   fechInicioDisfrute: string;
   fechaFinDisfrute: string;
   ResponsableValidacion: string;
@@ -367,6 +369,7 @@ export class ArchivoAdjuntoService {
         CON_CODIGO: 'codigo_concepto',
         UNIDADES: 'unidades',
         'FECHA NOVEDAD': 'fecha_novedad',
+        'DIAS A TOMAR': 'dias_a_tomar',
         'FECHA INICIO DISFRUTE': 'fecha_inicio_disfrute',
         'FECHA FIN DISFRUTE': 'fecha_fin_disfrute',
         'RESPONSABLE VALIDACIÓN': 'responsable_validacion',
@@ -381,6 +384,7 @@ export class ArchivoAdjuntoService {
       const headerMap: Record<string, number> = {};
 
       headerRow.eachCell((cell, colNumber) => {
+        console.log(`📌 Columna ${colNumber}:`, cell.value);
         const texto = typeof cell.value === 'string' ? cell.value.trim() : '';
         const campoBD = encabezadosToCamposBD[texto];
         if (campoBD) {
@@ -420,6 +424,7 @@ export class ArchivoAdjuntoService {
           codigo_concepto: null,
           unidades: 0,
           fecha_novedad: null,
+          dias_a_tomar: 0,
           fecha_inicio_disfrute: null,
           fecha_fin_disfrute: null,
           responsable_validacion: '',
@@ -875,6 +880,7 @@ export class ArchivoAdjuntoService {
         fecha_inicio: s.fecha_inicio,
         fecha_fin: s.fecha_fin,
         fecha_novedad: s.fecha_novedad,
+        dias_a_tomar: s.dias_a_tomar ?? 0,
         fecha_inicio_disfrute: s.fecha_inicio_disfrute,
         fecha_fin_disfrute: s.fecha_fin_disfrute,
         fecha_pago: s.fecha_pago,
@@ -925,14 +931,15 @@ export class ArchivoAdjuntoService {
       row.getCell('R').value = fila.codigo;
       row.getCell('S').value = fila.unidades;
       row.getCell('T').value = fila.fechaNove;
-      row.getCell('U').value = fila.fechInicioDisfrute;
-      row.getCell('V').value = fila.fechaFinDisfrute;
-      row.getCell('W').value = fila.ResponsableValidacion;
-      row.getCell('X').value = fila.RespuestaValidacion;
-      row.getCell('Y').value = fila.ajuste;
-      row.getCell('Z').value = fila.Fechapago;
-      row.getCell('AA').value = fila.AreaRespon;
-      row.getCell('AB').value = fila.CategInconsitencia;
+      row.getCell('U').value = fila.diasATomar;
+      row.getCell('V').value = fila.fechInicioDisfrute;
+      row.getCell('W').value = fila.fechaFinDisfrute;
+      row.getCell('X').value = fila.ResponsableValidacion;
+      row.getCell('Y').value = fila.RespuestaValidacion;
+      row.getCell('Z').value = fila.ajuste;
+      row.getCell('AA').value = fila.Fechapago;
+      row.getCell('AB').value = fila.AreaRespon;
+      row.getCell('AC').value = fila.CategInconsitencia;
 
       row.commit();
     });
