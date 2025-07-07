@@ -688,7 +688,7 @@ export class ArchivoAdjuntoService {
       fecha: data.fecha ? new Date(data.fecha) : new Date(),
       cedula: data.cedula,
       nombre: data.nombre,
-      categoria: '-',
+      categoria: data.titulo ?? '-',
       tienda: data.tienda ?? '-',
       jefe: data.jefe ?? '-',
       detalle: data.detalle,
