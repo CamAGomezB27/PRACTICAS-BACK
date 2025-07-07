@@ -63,9 +63,41 @@ export class NovedadController {
     return this.novedadService.crearNovedad(body);
   }
 
+  @Post('individual')
+  async crearIndividual(
+    @Body()
+    body: {
+      cedula: number;
+      nombre: string;
+      titulo: string;
+      tienda?: string;
+      jefe?: string;
+      detalle: string;
+      fecha?: string;
+    },
+    @Req()
+    req: Request & {
+      user: {
+        id_usuario: number;
+        nombre: string;
+        correo: string;
+        esJefe: boolean;
+        esNomina: boolean;
+        nombreTienda: string;
+      };
+    },
+  ) {
+    return this.novedadService.crearNovedadIndividual(body, req.user);
+  }
+
   @Get(':id/masiva')
   async obtenerDetalleMasivo(@Param('id') id: string) {
     return this.novedadService.obtenerDetalleMasivo(+id);
+  }
+
+  @Get(':id/individual')
+  async obtenerDetalleIndividual(@Param('id') id: string) {
+    return this.novedadService.obtenerDetalleIndividual(+id);
   }
 
   @Get('masiva/tienda')

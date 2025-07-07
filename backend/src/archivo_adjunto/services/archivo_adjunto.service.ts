@@ -90,6 +90,16 @@ interface FilaParaExportar {
   CategInconsitencia: string;
 }
 
+interface CrearNovedadIndividual {
+  titulo: string;
+  cedula: number;
+  nombre: string;
+  detalle: string;
+  tienda?: string;
+  jefe?: string;
+  fecha?: string;
+}
+
 @Injectable()
 export class ArchivoAdjuntoService {
   constructor(private readonly prisma: PrismaService) {}
@@ -666,6 +676,49 @@ export class ArchivoAdjuntoService {
 
   private safeNumber(v: number | null | undefined): number {
     return typeof v === 'number' && !isNaN(v) ? v : 0;
+  }
+
+  async guardarFormularioIndividual(
+    data: CrearNovedadIndividual,
+    id_novedad: number,
+  ): Promise<void> {
+    const fila: FilaDB = {
+      id_novedad,
+      n: 1,
+      fecha: data.fecha ? new Date(data.fecha) : new Date(),
+      cedula: data.cedula,
+      nombre: data.nombre,
+      categoria: '-',
+      tienda: data.tienda ?? '-',
+      jefe: data.jefe ?? '-',
+      detalle: data.detalle,
+      jornada_empleado: '-',
+      jornada_otro_si: '-',
+      fecha_inicio: null,
+      fecha_fin: null,
+      salario_actual: 0,
+      salario_otro_si: 0,
+      consecutivo_forms: '-',
+      concepto: '-',
+      codigo_concepto: null,
+      unidades: 0,
+      fecha_novedad: null,
+      dias_a_tomar: 0,
+      fecha_inicio_disfrute: null,
+      fecha_fin_disfrute: null,
+      responsable_validacion: '',
+      respuesta_validacion: '',
+      ajuste: '',
+      fecha_pago: null,
+      area_responsable: '',
+      categoria_inconsistencia: '',
+    };
+
+    await this.prisma.detalleNovedadMasiva.create({
+      data: fila,
+    });
+
+    console.log('✅ Novedad individual guardada en la base');
   }
 
   async generarConsolidadoPostNomina(

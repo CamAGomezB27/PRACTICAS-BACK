@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from 'prisma/prisma.service';
 import { getMensajePorEstadoBackendPorId } from 'src/utils/getMensajePorEstado';
@@ -19,6 +19,27 @@ interface FiltrosParaNomina {
     lte?: Date;
   };
   estado?: string;
+}
+
+interface CrearNovedadIndividual {
+  titulo: string;
+  cedula: number;
+  nombre: string;
+  detalle: string;
+  tienda?: string;
+  jefe?: string;
+  fecha?: string;
+}
+
+interface AuthenticatedRequest extends Request {
+  user: {
+    nombre: string;
+    correo: string;
+    id_usuario: number;
+    esJefe: boolean;
+    esNomina: boolean;
+    nombreTienda: string;
+  };
 }
 
 @Injectable()
@@ -57,6 +78,60 @@ export class NovedadeService {
         })(),
       },
     });
+  }
+
+  async crearNovedadIndividual(
+    body: CrearNovedadIndividual,
+    user: AuthenticatedRequest['user'],
+  ) {
+    const rol = {
+      esNomina: user.esNomina,
+      esJefe: user.esJefe,
+    };
+
+    const mensaje = getMensajePorEstadoBackendPorId(1, rol);
+
+    const mapaTiposNovedad: Record<string, number> = {
+      'Auxilio de transporte': 1,
+      'Horas Extra': 2,
+      Vacaciones: 3,
+      'Otro Si Temporal': 4,
+      'Otro Si Definitivo': 5,
+      Descuento: 6,
+      Otros: 7,
+    };
+
+    const idTipoNovedad = mapaTiposNovedad[body.titulo] ?? null;
+
+    const novedad = await this.crearNovedad({
+      idUsuario: user.id_usuario,
+      descripcion: mensaje,
+      idEstado: 1,
+      idTipoNovedad,
+      esMasiva: false,
+      cantidadSolicitudes: 1,
+    });
+
+    await this.prisma.detalleNovedadMasiva.create({
+      data: {
+        id_novedad: novedad.id_novedad,
+        n: 1,
+        fecha: body.fecha ? new Date(body.fecha) : new Date(),
+        cedula: body.cedula,
+        nombre: body.nombre,
+        categoria: body.titulo,
+        tienda: body.tienda || user.nombreTienda,
+        jefe: body.jefe || user.nombre,
+        detalle: body.detalle,
+      },
+    });
+
+    return {
+      valido: true,
+      message: '✅ Novedad individual registrada correctamente',
+      usuario: user.nombre,
+      novedadId: novedad.id_novedad,
+    };
   }
 
   async obtenerNovedadesUsuarios(idUsuario: number, esJefe: boolean) {
@@ -292,6 +367,57 @@ export class NovedadeService {
     );
 
     return resultados;
+  }
+
+  async obtenerDetalleIndividual(idNovedad: number) {
+    const novedad = await this.prisma.novedad.findUnique({
+      where: { id_novedad: idNovedad },
+      include: {
+        estado_novedad: true,
+        tipo_novedad: true,
+        usuario: {
+          include: {
+            usuario_tienda: {
+              include: {
+                tienda: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!novedad) {
+      throw new NotFoundException(`Novedad #${idNovedad} no encontrada`);
+    }
+
+    if (novedad.es_masiva) {
+      throw new NotFoundException(
+        `La novedad #${idNovedad} es masiva. Usa el endpoint de masivas.`,
+      );
+    }
+
+    const detalle = await this.prisma.detalleNovedadMasiva.findFirst({
+      where: { id_novedad: idNovedad },
+      select: {
+        cedula: true,
+        nombre: true,
+        detalle: true,
+      },
+    });
+
+    return {
+      id_novedad: novedad.id_novedad,
+      tipo: novedad.tipo_novedad?.nombre_tipo ?? 'Sin tipo',
+      estado: novedad.estado_novedad?.nombre_estado ?? 'Sin estado',
+      tienda:
+        novedad.usuario?.usuario_tienda?.[0]?.tienda?.nombre_tienda ??
+        'Sin tienda',
+      fecha: novedad.fecha_creacion,
+      cedula: detalle?.cedula?.toString() ?? '',
+      nombre: detalle?.nombre ?? '',
+      detalle: detalle?.detalle ?? '',
+    };
   }
 
   async obtenerNovedadesPendientesParaNomina(filtros: FiltrosParaNomina = {}) {

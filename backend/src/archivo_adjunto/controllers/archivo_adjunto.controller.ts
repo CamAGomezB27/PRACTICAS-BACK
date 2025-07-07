@@ -81,6 +81,16 @@ interface FilaParaExportar {
   CategInconsitencia: string;
 }
 
+interface CrearNovedadIndividual {
+  titulo: string;
+  cedula: number;
+  nombre: string;
+  detalle: string;
+  tienda?: string;
+  jefe?: string;
+  fecha?: string;
+}
+
 @Controller('archivo-adjunto')
 export class ArchivoAdjuntoController {
   constructor(
@@ -253,6 +263,24 @@ export class ArchivoAdjuntoController {
       return {
         valido: false,
         message: 'No se pudo subir el archivo',
+        error: error instanceof Error ? error.stack : String(error),
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('formulario-novedad')
+  async subirFormulario(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: CrearNovedadIndividual,
+  ): Promise<any> {
+    try {
+      return await this.novedadService.crearNovedadIndividual(body, req.user);
+    } catch (error) {
+      console.error('❌ Error al subir novedad individual:', error);
+      return {
+        valido: false,
+        message: 'Error al registrar la novedad',
         error: error instanceof Error ? error.stack : String(error),
       };
     }
