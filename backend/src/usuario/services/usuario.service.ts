@@ -308,4 +308,62 @@ export class UsuarioService {
       mensaje: `✅ Usuario actualizado correctamente.`,
     };
   }
+
+  async eliminarUsuario(id_usuario: number) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id_usuario },
+    });
+
+    if (!usuario) {
+      throw new BadRequestException(
+        `El usuario con ID ${id_usuario} no existe.`,
+      );
+    }
+
+    // Eliminar relaciones primero
+    await this.prisma.usuario_rol.deleteMany({
+      where: { id_usuario },
+    });
+
+    await this.prisma.usuario_tienda.deleteMany({
+      where: { id_usuario },
+    });
+
+    await this.prisma.usuario.delete({
+      where: { id_usuario },
+    });
+
+    return {
+      mensaje: `🗑️ Usuario con ID ${id_usuario} eliminado correctamente.`,
+    };
+  }
+
+  async desactivarUsuario(id_usuario: number) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id_usuario },
+    });
+
+    if (!usuario) {
+      throw new BadRequestException(
+        `No existe un usuario con ID ${id_usuario}.`,
+      );
+    }
+
+    if (!usuario.estado) {
+      return {
+        mensaje: `🔕 El usuario con ID ${id_usuario} ya está inactivo.`,
+      };
+    }
+
+    await this.prisma.usuario.update({
+      where: { id_usuario },
+      data: {
+        estado: false,
+      },
+    });
+
+    return {
+      mensaje: `✅ Usuario con ID ${id_usuario} fue desactivado correctamente.`,
+    };
+  }
 }

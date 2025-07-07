@@ -1,5 +1,14 @@
 // src/usuario/controllers/usuario.controller.ts
-import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+} from '@nestjs/common';
 import { UsuarioService } from '../services/usuario.service';
 
 interface CrearUsuarioInput {
@@ -52,5 +61,15 @@ export class UsuarioController {
   @Put(':id/editar')
   async editarUsuario(@Param('id') id: string, @Body() body: EditarUsuario) {
     return this.usuarioService.editarUsuario(+id, body);
+  }
+
+  @Delete(':id/eliminar')
+  async eliminarUsuario(@Param('id') id: string) {
+    return this.usuarioService.eliminarUsuario(+id);
+  }
+
+  @Patch(':id/desactivar')
+  async desactivarUsuario(@Param('id') id: string) {
+    return this.usuarioService.desactivarUsuario(+id);
   }
 }
