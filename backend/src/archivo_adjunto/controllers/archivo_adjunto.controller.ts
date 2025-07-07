@@ -275,12 +275,111 @@ export class ArchivoAdjuntoController {
     @Body() body: CrearNovedadIndividual,
   ): Promise<any> {
     try {
-      return await this.novedadService.crearNovedadIndividual(body, req.user);
-    } catch (error) {
+      const { cedula, nombre, detalle, fecha, tienda, jefe, titulo } = body;
+
+      const errores: string[] = [];
+
+      // ✅ Validaciones básicas
+      if (!/^\d{6,10}$/.test(String(cedula))) {
+        errores.push('La cédula debe contener entre 6 y 10 dígitos numéricos.');
+      }
+
+      if (
+        !/^[A-Za-zÁÉÍÓÚÑáéíóúñ\s'.-]+$/.test(nombre) ||
+        nombre.trim().length < 7
+      ) {
+        errores.push(
+          'El nombre es inválido o demasiado corto (mínimo 7 caracteres).',
+        );
+      }
+
+      if (
+        !detalle ||
+        detalle.trim().length < 15 ||
+        detalle.trim().length > 250
+      ) {
+        errores.push(
+          'El detalle debe tener entre 15 y 250 caracteres. Asegúrate de incluir suficiente información.',
+        );
+      }
+
+      if (!fecha || !tienda || !jefe) {
+        console.warn(
+          '🟡 Advertencia: datos esperados por el sistema no fueron enviados desde el frontend',
+        );
+      }
+
+      // ⚠️ Validar título internamente sin lanzar error al usuario
+      const tiposPermitidos = [
+        'Auxilio de transporte',
+        'Horas Extra',
+        'Vacaciones',
+        'Otro Si Temporal',
+        'Otro Si Definitivo',
+        'Descuento',
+        'Otros',
+      ];
+
+      if (!tiposPermitidos.includes(titulo)) {
+        console.warn(`⚠️ Título de novedad no reconocido: "${titulo}".`);
+      }
+
+      // 🛑 Si hay errores, retornar
+      if (errores.length > 0) {
+        console.warn('🛑 Errores en el formulario individual:', errores);
+        return {
+          valido: false,
+          errores,
+        };
+      }
+
+      // ✅ Procesar novedad
+      const mapaTiposNovedad: Record<string, number> = {
+        'Auxilio de transporte': 1,
+        'Horas Extra': 2,
+        Vacaciones: 3,
+        'Otro Si Temporal': 4,
+        'Otro Si Definitivo': 5,
+        Descuento: 6,
+        Otros: 7,
+      };
+
+      const idTipoNovedad = mapaTiposNovedad[titulo] ?? null;
+
+      const rol = {
+        esNomina: req.user.esNomina,
+        esJefe: req.user.esJefe,
+      };
+
+      const mensaje = getMensajePorEstadoBackendPorId(1, rol);
+
+      const novedad = await this.novedadService.crearNovedad({
+        idUsuario: req.user.id_usuario,
+        descripcion: mensaje,
+        idEstado: 1,
+        idTipoNovedad,
+        esMasiva: false,
+        cantidadSolicitudes: 1,
+      });
+
+      await this.archivoAdjuntoService.guardarFormularioIndividual(
+        body,
+        novedad.id_novedad,
+      );
+
+      console.log('✅ Novedad individual registrada con éxito');
+
+      return {
+        valido: true,
+        message: '✅ Novedad individual registrada con éxito',
+        usuario: req.user.nombre,
+        novedadId: novedad.id_novedad,
+      };
+    } catch (error: unknown) {
       console.error('❌ Error al subir novedad individual:', error);
       return {
         valido: false,
-        message: 'Error al registrar la novedad',
+        message: '❌ Error al registrar la novedad',
         error: error instanceof Error ? error.stack : String(error),
       };
     }
