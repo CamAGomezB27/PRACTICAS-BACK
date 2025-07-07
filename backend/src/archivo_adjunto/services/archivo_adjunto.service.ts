@@ -91,13 +91,37 @@ interface FilaParaExportar {
 }
 
 interface CrearNovedadIndividual {
-  titulo: string;
+  //BASICOS
   cedula: number;
   nombre: string;
   detalle: string;
+  titulo: string;
+  categoria?: string;
   tienda?: string;
   jefe?: string;
-  fecha?: string;
+  fecha?: string; // 👈 importante para el registro base
+
+  // Para Vacaciones
+
+  dias?: number;
+
+  // Para Horas Extra
+  concepto?: string;
+  codigo?: string;
+  unidad?: string;
+
+  // para Otro Si Temporal
+  jornada_actual?: string;
+  nueva_jornada?: string;
+
+  salario_actual?: number;
+  nuevo_salario?: number;
+  consecutivo?: string;
+
+  //LOS QUE SE REPITEN
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  fecha_novedad?: string;
 }
 
 @Injectable()
@@ -678,23 +702,75 @@ export class ArchivoAdjuntoService {
     return typeof v === 'number' && !isNaN(v) ? v : 0;
   }
 
+  private mapearCamposPorTipo(data: CrearNovedadIndividual): Partial<FilaDB> {
+    const campos: Partial<FilaDB> = {};
+
+    switch (data.titulo) {
+      case 'Vacaciones':
+        campos.fecha_inicio_disfrute = data.fecha_inicio
+          ? new Date(data.fecha_inicio)
+          : null;
+
+        campos.fecha_fin_disfrute = data.fecha_fin
+          ? new Date(data.fecha_fin)
+          : null;
+
+        campos.dias_a_tomar = data.dias ?? 0;
+        break;
+
+      case 'Horas Extra':
+        campos.concepto = data.concepto ?? '-';
+        campos.codigo_concepto = data.codigo ? Number(data.codigo) : 0;
+        campos.unidades = data.unidad ? Number(data.unidad) : 0;
+        campos.fecha_novedad = data.fecha_novedad
+          ? new Date(new Date(data.fecha_novedad).setUTCHours(5, 0, 0, 0))
+          : null;
+        break;
+
+      case 'Otro Si Temporal':
+        campos.jornada_empleado = data.jornada_actual ?? '-';
+        campos.jornada_otro_si = data.nueva_jornada ?? '-';
+        campos.fecha_inicio = data.fecha_inicio
+          ? new Date(data.fecha_inicio)
+          : null;
+        campos.fecha_fin = data.fecha_fin ? new Date(data.fecha_fin) : null;
+        campos.salario_actual = data.salario_actual ?? 0;
+        campos.salario_otro_si = data.nuevo_salario ?? 0;
+        campos.consecutivo_forms = data.consecutivo ?? '-';
+        campos.fecha_novedad = data.fecha_novedad
+          ? new Date(new Date(data.fecha_novedad).setUTCHours(5, 0, 0, 0))
+          : null;
+        break;
+    }
+
+    return campos;
+  }
+
   async guardarFormularioIndividual(
     data: CrearNovedadIndividual,
     id_novedad: number,
   ): Promise<void> {
+    const camposExtra = this.mapearCamposPorTipo(data);
+
     const fila: FilaDB = {
       id_novedad,
       n: 1,
-      fecha: data.fecha ? new Date(data.fecha) : new Date(),
+      fecha: data.fecha
+        ? new Date(new Date(data.fecha).setUTCHours(5, 0, 0, 0))
+        : new Date(new Date().setUTCHours(5, 0, 0, 0)),
+
+      // Asignaciones comunes
       cedula: data.cedula,
       nombre: data.nombre,
       categoria: data.titulo ?? '-',
       tienda: data.tienda ?? '-',
       jefe: data.jefe ?? '-',
       detalle: data.detalle,
+
+      // Solo los campos comunes en blanco, que luego se sobreescriben si aplica
       jornada_empleado: '-',
       jornada_otro_si: '-',
-      fecha_inicio: null,
+      fecha_inicio: null, // solo para contratos
       fecha_fin: null,
       salario_actual: 0,
       salario_otro_si: 0,
@@ -704,7 +780,7 @@ export class ArchivoAdjuntoService {
       unidades: 0,
       fecha_novedad: null,
       dias_a_tomar: 0,
-      fecha_inicio_disfrute: null,
+      fecha_inicio_disfrute: null, // solo para vacaciones
       fecha_fin_disfrute: null,
       responsable_validacion: '',
       respuesta_validacion: '',
@@ -712,7 +788,11 @@ export class ArchivoAdjuntoService {
       fecha_pago: null,
       area_responsable: '',
       categoria_inconsistencia: '',
+
+      ...camposExtra, // ← Aquí se inyectan los campos según el tipo
     };
+
+    console.log('🧾 Fila a guardar:', fila);
 
     await this.prisma.detalleNovedadMasiva.create({
       data: fila,

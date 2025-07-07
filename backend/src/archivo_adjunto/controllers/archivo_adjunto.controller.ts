@@ -82,13 +82,37 @@ interface FilaParaExportar {
 }
 
 interface CrearNovedadIndividual {
-  titulo: string;
+  //BASICOS
   cedula: number;
   nombre: string;
   detalle: string;
+  titulo: string;
+  categoria?: string;
   tienda?: string;
   jefe?: string;
-  fecha?: string;
+  fecha?: string; // 👈 importante para el registro base
+
+  // Para Vacaciones
+
+  dias?: number;
+
+  // Para Horas Extra
+  concepto?: string;
+  codigo?: string;
+  unidad?: string;
+
+  // para Otro Si Temporal
+  jornada_actual?: string;
+  nueva_jornada?: string;
+
+  salario_actual?: number;
+  nuevo_salario?: number;
+  consecutivo?: string;
+
+  //LOS QUE SE REPITEN
+  fecha_inicio?: string;
+  fecha_fin?: string;
+  fecha_novedad?: string;
 }
 
 @Controller('archivo-adjunto')
