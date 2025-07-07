@@ -1,5 +1,5 @@
 // src/usuario/controllers/usuario.controller.ts
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
 import { UsuarioService } from '../services/usuario.service';
 
 interface CrearUsuarioInput {
@@ -7,6 +7,11 @@ interface CrearUsuarioInput {
   correo: string;
   rol: string;
   tienda?: string; // solo si aplica
+}
+
+interface EditarUsuario {
+  nuevoRolId: number;
+  idTienda?: number;
 }
 
 @Controller('usuario')
@@ -41,5 +46,11 @@ export class UsuarioController {
   @Get()
   async obtenerRolesYTiendas() {
     return this.usuarioService.obtenerRolesYTiendas();
+  }
+
+  //editar por ID
+  @Put(':id/editar')
+  async editarUsuario(@Param('id') id: string, @Body() body: EditarUsuario) {
+    return this.usuarioService.editarUsuario(+id, body);
   }
 }

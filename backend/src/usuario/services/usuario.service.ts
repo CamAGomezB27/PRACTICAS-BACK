@@ -36,6 +36,11 @@ type UsuarioConRelaciones = {
   }[];
 };
 
+interface EditarUsuario {
+  nuevoRolId: number;
+  idTienda?: number;
+}
+
 @Injectable()
 export class UsuarioService {
   constructor(private prisma: PrismaService) {}
@@ -216,5 +221,91 @@ export class UsuarioService {
         ubicacion: u.ubicacion || null,
       };
     });
+  }
+
+  async editarUsuario(id_usuario: number, dto: EditarUsuario) {
+    const { nuevoRolId, idTienda } = dto;
+
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id_usuario },
+    });
+
+    if (!usuario) {
+      throw new BadRequestException(`Usuario con ID ${id_usuario} no existe.`);
+    }
+
+    const rolExistente = await this.prisma.usuario_rol.findFirst({
+      where: { id_usuario },
+    });
+
+    if (rolExistente && rolExistente.id_rol !== nuevoRolId) {
+      await this.prisma.usuario_rol.update({
+        where: {
+          id_usuario_id_rol: {
+            id_usuario,
+            id_rol: rolExistente.id_rol,
+          },
+        },
+        data: {
+          id_rol: nuevoRolId,
+        },
+      });
+    }
+
+    // Si el nuevo rol es Jefe de Tienda (ID 3)
+    if (nuevoRolId === 3) {
+      if (!idTienda || idTienda < 1) {
+        throw new BadRequestException(
+          'Debe indicar una tienda válida para el Jefe de Tienda.',
+        );
+      }
+
+      const tiendaYaAsignada = await this.prisma.usuario_tienda.findFirst({
+        where: {
+          id_tienda: idTienda,
+          NOT: { id_usuario },
+        },
+      });
+
+      if (tiendaYaAsignada) {
+        throw new BadRequestException(
+          `La tienda con ID ${idTienda} ya está asignada a otro usuario.`,
+        );
+      }
+
+      const tiendaActual = await this.prisma.usuario_tienda.findFirst({
+        where: { id_usuario },
+      });
+
+      if (tiendaActual) {
+        await this.prisma.usuario_tienda.update({
+          where: {
+            id_usuario_id_tienda: {
+              id_usuario,
+              id_tienda: tiendaActual.id_tienda,
+            },
+          },
+          data: {
+            id_tienda: idTienda,
+          },
+        });
+      } else {
+        await this.prisma.usuario_tienda.create({
+          data: {
+            id_usuario,
+            id_tienda: idTienda,
+          },
+        });
+      }
+    } else {
+      // Si no es jefe de tienda y tenía tienda asignada, se borra esa asignación
+      await this.prisma.usuario_tienda.deleteMany({
+        where: { id_usuario },
+      });
+    }
+
+    return {
+      mensaje: `✅ Usuario actualizado correctamente.`,
+    };
   }
 }
