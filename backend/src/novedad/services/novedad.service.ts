@@ -681,7 +681,7 @@ export class NovedadeService {
 
     return this.prisma.detalleNovedadMasiva.findMany({
       where: whereCondition,
-      orderBy: { id_novedad: 'desc' },
+      orderBy: { id_novedad: 'asc' },
       select: {
         id_novedad: true,
         n: true,
@@ -862,7 +862,7 @@ export class NovedadeService {
 
     return this.prisma.detalleNovedadMasiva.findMany({
       where: whereCondition,
-      orderBy: { id_novedad: 'desc' },
+      orderBy: { id_novedad: 'asc' },
       select: {
         id_novedad: true,
         n: true,
