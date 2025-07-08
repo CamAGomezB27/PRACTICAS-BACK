@@ -403,6 +403,13 @@ export class NovedadeService {
         cedula: true,
         nombre: true,
         detalle: true,
+        jornada_empleado: true,
+        jornada_otro_si: true,
+        salario_actual: true,
+        salario_otro_si: true,
+        fecha_inicio: true,
+        fecha_fin: true,
+        consecutivo_forms: true,
       },
     });
 
@@ -417,6 +424,14 @@ export class NovedadeService {
       cedula: detalle?.cedula?.toString() ?? '',
       nombre: detalle?.nombre ?? '',
       detalle: detalle?.detalle ?? '',
+
+      jornada_actual: detalle?.jornada_empleado ?? '',
+      nueva_jornada: detalle?.jornada_otro_si ?? '',
+      salario_actual: detalle?.salario_actual ?? 0,
+      nuevo_salario: detalle?.salario_otro_si ?? 0,
+      fecha_inicio: detalle?.fecha_inicio ?? null,
+      fecha_fin: detalle?.fecha_fin ?? null,
+      consecutivo: detalle?.consecutivo_forms ?? '',
     };
   }
 
