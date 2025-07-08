@@ -969,7 +969,7 @@ export class ArchivoAdjuntoService {
   ): Promise<SolicitudConIdDetalle[]> {
     const solicitudes = await this.prisma.detalleNovedadMasiva.findMany({
       where: { id_novedad },
-      orderBy: { n: 'asc' },
+      orderBy: { n: 'desc' },
     });
 
     return solicitudes.map((s) => {
@@ -1124,11 +1124,12 @@ export class ArchivoAdjuntoService {
       if (!detalle) continue;
 
       // Obtener celdas
-      const respuestaValidacion = this.getCellValue(row, 'X');
-      const ajuste = this.getCellValue(row, 'Y');
-      const fechaPagoRaw = row.getCell('Z').value;
-      const areaResponsable = this.getCellValue(row, 'AA');
-      const categoriaInconsistencia = this.getCellValue(row, 'AB');
+      const responValidacion = this.getCellValue(row, 'X');
+      const respuestaValidacion = this.getCellValue(row, 'Y');
+      const ajuste = this.getCellValue(row, 'Z');
+      const fechaPagoRaw = row.getCell('AA').value;
+      const areaResponsable = this.getCellValue(row, 'AB');
+      const categoriaInconsistencia = this.getCellValue(row, 'AC');
 
       const fecha_pago =
         fechaPagoRaw instanceof Date
@@ -1141,6 +1142,7 @@ export class ArchivoAdjuntoService {
       await this.prisma.detalleNovedadMasiva.update({
         where: { id_detalle: detalle.id_detalle },
         data: {
+          responsable_validacion: responValidacion,
           respuesta_validacion: respuestaValidacion,
           ajuste,
           fecha_pago,

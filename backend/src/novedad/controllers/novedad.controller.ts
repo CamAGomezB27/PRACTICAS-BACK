@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -11,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
+import { PrismaService } from 'prisma/prisma.service';
 import { getMensajePorEstadoBackendPorId } from 'src/utils/getMensajePorEstado';
 import { NovedadeService } from '../services/novedad.service';
 
@@ -37,10 +39,22 @@ interface FiltrosParaNomina {
   };
 }
 
+interface RespuestaIndividual {
+  respuesta_validacion: string;
+  responsable_validacion: string;
+  ajuste: string;
+  fecha_pago: string;
+  area_responsable: string;
+  categoria_inconsistencia: string;
+}
+
 @Controller('novedad')
 @UseGuards(AuthGuard('jwt'))
 export class NovedadController {
-  constructor(private readonly novedadService: NovedadeService) {}
+  constructor(
+    private readonly novedadService: NovedadeService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Get()
   async obtenerNovedades(@Req() req: Request) {
@@ -346,5 +360,69 @@ export class NovedadController {
         mensaje: 'Error al validar duplicado',
       };
     }
+  }
+
+  @Put('guardar-respuesta-individual/:idNovedad')
+  async guardarRespuestaIndividual(
+    @Param('idNovedad') idNovedad: number,
+    @Body() body: RespuestaIndividual,
+  ) {
+    const detalle = await this.prisma.detalleNovedadMasiva.findFirst({
+      where: {
+        id_novedad: Number(idNovedad),
+        novedad: {
+          id_estado_novedad: 2, // EN GESTIÓN
+        },
+      },
+      include: { novedad: true },
+    });
+
+    if (!detalle) {
+      throw new BadRequestException(
+        '❌ No se encontró el detalle para esta novedad o no está en gestión.',
+      );
+    }
+
+    // 🔍 Validación segura de la fecha
+    let fechaPagoValida: Date | null = null;
+
+    if (body.fecha_pago) {
+      const parsed = Date.parse(body.fecha_pago);
+      if (!isNaN(parsed)) {
+        fechaPagoValida = new Date(parsed);
+      } else {
+        throw new BadRequestException('❌ La fecha de pago no es válida.');
+      }
+    }
+
+    await this.prisma.detalleNovedadMasiva.update({
+      where: { id_detalle: detalle.id_detalle },
+      data: {
+        respuesta_validacion: body.respuesta_validacion,
+        responsable_validacion: body.responsable_validacion,
+        ajuste: body.ajuste,
+        fecha_pago: fechaPagoValida,
+        area_responsable: body.area_responsable,
+        categoria_inconsistencia: body.categoria_inconsistencia,
+      },
+    });
+
+    // ✅ Verifica si todas las respuestas ya están diligenciadas
+    const detalles = await this.prisma.detalleNovedadMasiva.findMany({
+      where: { id_novedad: Number(idNovedad) },
+    });
+
+    const todosCompletos = detalles.every(
+      (d) => d.respuesta_validacion && d.respuesta_validacion.trim() !== '',
+    );
+
+    if (todosCompletos) {
+      await this.prisma.novedad.update({
+        where: { id_novedad: Number(idNovedad) },
+        data: { id_estado_novedad: 3 },
+      });
+    }
+
+    return { mensaje: '✅ Respuesta guardada exitosamente' };
   }
 }

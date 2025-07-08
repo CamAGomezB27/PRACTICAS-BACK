@@ -915,4 +915,57 @@ export class NovedadeService {
       return false;
     }
   }
+
+  async guardarRespuestaIndividual(
+    idDetalle: number,
+    data: {
+      respuesta_validacion: string;
+      responsable_validacion: string;
+      ajuste: string;
+      fecha_pago: string;
+      area_responsable: string;
+      categoria_inconsistencia: string;
+    },
+  ): Promise<{ mensaje: string }> {
+    const detalle = await this.prisma.detalleNovedadMasiva.findUnique({
+      where: { id_detalle: idDetalle },
+      include: { novedad: true },
+    });
+
+    if (!detalle || detalle.novedad.id_estado_novedad !== 2) {
+      throw new Error(
+        '❌ Detalle no encontrado o no está en estado EN GESTIÓN',
+      );
+    }
+
+    await this.prisma.detalleNovedadMasiva.update({
+      where: { id_detalle: idDetalle },
+      data: {
+        respuesta_validacion: data.respuesta_validacion,
+        responsable_validacion: data.responsable_validacion,
+        ajuste: data.ajuste,
+        fecha_pago: new Date(data.fecha_pago),
+        area_responsable: data.area_responsable,
+        categoria_inconsistencia: data.categoria_inconsistencia,
+      },
+    });
+
+    // Verificamos si todos los detalles están completados
+    const detalles = await this.prisma.detalleNovedadMasiva.findMany({
+      where: { id_novedad: detalle.id_novedad },
+    });
+
+    const todosListos = detalles.every(
+      (d) => d.respuesta_validacion && d.respuesta_validacion.trim() !== '',
+    );
+
+    if (todosListos) {
+      await this.prisma.novedad.update({
+        where: { id_novedad: detalle.id_novedad },
+        data: { id_estado_novedad: 3 }, // GESTIONADA
+      });
+    }
+
+    return { mensaje: '✅ Respuesta guardada correctamente.' };
+  }
 }
