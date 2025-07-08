@@ -65,6 +65,13 @@ interface DetalleIndividual {
   area_responsable: string;
   categoria_inconsistencia: string;
   responsable_validacion: string;
+  concepto: string;
+  codigo_concepto: number | null;
+  unidades: number | null;
+  fecha_novedad: Date | null;
+  fecha_inicio_disfrute: Date | null;
+  fecha_fin_disfrute: Date | null;
+  dias: number;
 }
 
 @Injectable()
@@ -455,8 +462,14 @@ export class NovedadeService {
         fecha_inicio: true,
         fecha_fin: true,
         consecutivo_forms: true,
+        concepto: true,
+        codigo_concepto: true,
+        unidades: true,
+        fecha_novedad: true,
+        dias_a_tomar: true,
+        fecha_inicio_disfrute: true,
+        fecha_fin_disfrute: true,
 
-        // ✅ Aquí vienen los campos que estaban mal pedidos en novedad:
         respuesta_validacion: true,
         responsable_validacion: true,
         ajuste: true,
@@ -473,11 +486,14 @@ export class NovedadeService {
       tienda:
         novedad.usuario?.usuario_tienda?.[0]?.tienda?.nombre_tienda ??
         'Sin tienda',
+
+      //LOS QUE SE REPITEN
       fecha: novedad.fecha_creacion,
       cedula: detalle?.cedula?.toString() ?? '',
       nombre: detalle?.nombre ?? '',
       detalle: detalle?.detalle ?? '',
 
+      //OTRO SI TEMPORAL
       jornada_actual: detalle?.jornada_empleado ?? '',
       nueva_jornada: detalle?.jornada_otro_si ?? '',
       salario_actual: detalle?.salario_actual ?? 0,
@@ -485,6 +501,17 @@ export class NovedadeService {
       fecha_inicio: detalle?.fecha_inicio ?? null,
       fecha_fin: detalle?.fecha_fin ?? null,
       consecutivo: detalle?.consecutivo_forms ?? '',
+
+      //HORAS EXTRA
+      concepto: detalle?.concepto ?? '',
+      codigo_concepto: detalle?.codigo_concepto ?? null,
+      unidades: detalle?.unidades ?? null,
+      fecha_novedad: detalle?.fecha_novedad ?? null,
+
+      //VACACIONES
+      dias: detalle?.dias_a_tomar ?? 0,
+      fecha_inicio_disfrute: detalle?.fecha_inicio_disfrute ?? null,
+      fecha_fin_disfrute: detalle?.fecha_fin_disfrute ?? null,
 
       // ✅ Datos de Nómina
       respuesta: detalle?.respuesta_validacion ?? '',

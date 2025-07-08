@@ -71,6 +71,13 @@ interface DetalleIndividual {
   area_responsable: string;
   categoria_inconsistencia: string;
   responsable_validacion: string;
+  concepto: string;
+  codigo_concepto: number | null;
+  unidades: number | null;
+  fecha_novedad: Date | null;
+  fecha_inicio_disfrute: Date | null;
+  fecha_fin_disfrute: Date | null;
+  dias: number;
 }
 
 @Controller('novedad')
