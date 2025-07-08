@@ -48,6 +48,31 @@ interface RespuestaIndividual {
   categoria_inconsistencia: string;
 }
 
+interface DetalleIndividual {
+  id_novedad: number;
+  tipo: string;
+  estado: string;
+  tienda: string;
+  fecha: Date | null;
+  cedula: string;
+  nombre: string;
+  detalle: string;
+  jornada_actual: string;
+  nueva_jornada: string;
+  salario_actual: number;
+  nuevo_salario: number;
+  fecha_inicio: Date | null;
+  fecha_fin: Date | null;
+  consecutivo: string;
+  respuesta: string;
+  validacion: string;
+  ajuste: boolean;
+  fecha_pago: Date | null;
+  area_responsable: string;
+  categoria_inconsistencia: string;
+  responsable_validacion: string;
+}
+
 @Controller('novedad')
 @UseGuards(AuthGuard('jwt'))
 export class NovedadController {
@@ -110,7 +135,9 @@ export class NovedadController {
   }
 
   @Get(':id/individual')
-  async obtenerDetalleIndividual(@Param('id') id: string) {
+  async obtenerDetalleIndividual(
+    @Param('id') id: string,
+  ): Promise<DetalleIndividual> {
     return this.novedadService.obtenerDetalleIndividual(+id);
   }
 

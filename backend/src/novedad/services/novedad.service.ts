@@ -42,6 +42,31 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+interface DetalleIndividual {
+  id_novedad: number;
+  tipo: string;
+  estado: string;
+  tienda: string;
+  fecha: Date | null;
+  cedula: string;
+  nombre: string;
+  detalle: string;
+  jornada_actual: string;
+  nueva_jornada: string;
+  salario_actual: number;
+  nuevo_salario: number;
+  fecha_inicio: Date | null;
+  fecha_fin: Date | null;
+  consecutivo: string;
+  respuesta: string;
+  validacion: string;
+  ajuste: boolean;
+  fecha_pago: Date | null;
+  area_responsable: string;
+  categoria_inconsistencia: string;
+  responsable_validacion: string;
+}
+
 @Injectable()
 export class NovedadeService {
   constructor(private prisma: PrismaService) {}
@@ -369,17 +394,37 @@ export class NovedadeService {
     return resultados;
   }
 
-  async obtenerDetalleIndividual(idNovedad: number) {
+  async obtenerDetalleIndividual(
+    idNovedad: number,
+  ): Promise<DetalleIndividual> {
     const novedad = await this.prisma.novedad.findUnique({
       where: { id_novedad: idNovedad },
-      include: {
-        estado_novedad: true,
-        tipo_novedad: true,
+      select: {
+        id_novedad: true,
+        id_estado_novedad: true,
+        id_tipo_novedad: true,
+        fecha_creacion: true,
+        es_masiva: true,
+        descripcion: true,
+        estado_novedad: {
+          select: {
+            nombre_estado: true,
+          },
+        },
+        tipo_novedad: {
+          select: {
+            nombre_tipo: true,
+          },
+        },
         usuario: {
-          include: {
+          select: {
             usuario_tienda: {
-              include: {
-                tienda: true,
+              select: {
+                tienda: {
+                  select: {
+                    nombre_tienda: true,
+                  },
+                },
               },
             },
           },
@@ -410,6 +455,14 @@ export class NovedadeService {
         fecha_inicio: true,
         fecha_fin: true,
         consecutivo_forms: true,
+
+        // ✅ Aquí vienen los campos que estaban mal pedidos en novedad:
+        respuesta_validacion: true,
+        responsable_validacion: true,
+        ajuste: true,
+        fecha_pago: true,
+        area_responsable: true,
+        categoria_inconsistencia: true,
       },
     });
 
@@ -432,6 +485,15 @@ export class NovedadeService {
       fecha_inicio: detalle?.fecha_inicio ?? null,
       fecha_fin: detalle?.fecha_fin ?? null,
       consecutivo: detalle?.consecutivo_forms ?? '',
+
+      // ✅ Datos de Nómina
+      respuesta: detalle?.respuesta_validacion ?? '',
+      validacion: detalle?.respuesta_validacion ?? '',
+      ajuste: detalle?.ajuste === 'true',
+      fecha_pago: detalle?.fecha_pago ?? null,
+      area_responsable: detalle?.area_responsable ?? '',
+      categoria_inconsistencia: detalle?.categoria_inconsistencia ?? '',
+      responsable_validacion: detalle?.responsable_validacion ?? '',
     };
   }
 
