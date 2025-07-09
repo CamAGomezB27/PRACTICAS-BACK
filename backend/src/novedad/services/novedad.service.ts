@@ -529,19 +529,35 @@ export class NovedadeService {
     };
   }
 
-  async buscarCedulas(q?: string) {
+  async buscarCedulas(q?: string, nombreTienda?: string, esNomina?: boolean) {
     if (!q || isNaN(Number(q))) return [];
 
-    const cedulas = await this.prisma.$queryRaw<
-      { cedula: number; nombre: string }[]
-    >(Prisma.sql`
-    SELECT DISTINCT cedula, nombre
-    FROM "detalle_novedad_masiva"
-    WHERE CAST(cedula AS TEXT) LIKE ${q + '%'}
-    LIMIT 10
-  `);
+    // Si es de nómina, retorna todas las coincidencias
+    if (esNomina) {
+      return await this.prisma.$queryRaw<
+        { cedula: number; nombre: string }[]
+      >(Prisma.sql`
+      SELECT DISTINCT cedula, nombre
+      FROM "detalle_novedad_masiva"
+      WHERE CAST(cedula AS TEXT) LIKE ${q + '%'}
+      LIMIT 10
+    `);
+    }
 
-    return cedulas;
+    // Si es de tienda, filtra por nombre de tienda
+    if (nombreTienda) {
+      return await this.prisma.$queryRaw<
+        { cedula: number; nombre: string }[]
+      >(Prisma.sql`
+      SELECT DISTINCT cedula, nombre
+      FROM "detalle_novedad_masiva"
+      WHERE tienda = ${nombreTienda}
+        AND CAST(cedula AS TEXT) LIKE ${q + '%'}
+      LIMIT 10
+    `);
+    }
+
+    return [];
   }
 
   async obtenerNovedadesPendientesParaNomina(filtros: FiltrosParaNomina = {}) {

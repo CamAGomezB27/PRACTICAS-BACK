@@ -21,6 +21,22 @@ interface JwtPayload {
   esJefe: boolean;
 }
 
+interface AuthenticatedRequest extends Request {
+  user: {
+    correo: string;
+    id_usuario: number;
+    nombre: string;
+    rol: string;
+    esAdmin: boolean;
+    esJefe: boolean;
+    esNomina: boolean;
+    panelTitle: string;
+    userRoleTitle: string;
+    nombreTienda?: string;
+    iat: number;
+  };
+}
+
 interface FiltrosTienda {
   tipo?: string;
   fecha?: {
@@ -206,8 +222,12 @@ export class NovedadController {
   }
 
   @Get('masiva/cedulas-sugeridas')
-  async obtenerCedulasSugeridas(@Query('q') q?: string) {
-    return this.novedadService.buscarCedulas(q);
+  async obtenerCedulasSugeridas(
+    @Req() req: AuthenticatedRequest,
+    @Query('q') q?: string,
+  ) {
+    const { nombreTienda, esNomina } = req.user;
+    return this.novedadService.buscarCedulas(q, nombreTienda, esNomina);
   }
 
   @Get('novedades-pendientes')
