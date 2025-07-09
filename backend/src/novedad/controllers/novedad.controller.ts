@@ -28,6 +28,7 @@ interface FiltrosTienda {
     lte?: Date;
   };
   estado?: string;
+  cedula?: number;
 }
 
 interface FiltrosParaNomina {
@@ -37,6 +38,7 @@ interface FiltrosParaNomina {
     gte?: Date;
     lte?: Date;
   };
+  cedula?: number;
 }
 
 interface RespuestaIndividual {
@@ -154,12 +156,16 @@ export class NovedadController {
     @Query('tipo') tipo?: string,
     @Query('desde') desde?: string,
     @Query('hasta') hasta?: string,
+    @Query('cedula') cedula?: string,
   ) {
     const { id_usuario } = req.user as JwtPayload;
 
     const filtros: FiltrosTienda = {};
 
     if (tipo) filtros.tipo = tipo;
+    if (cedula && !isNaN(Number(cedula))) {
+      filtros.cedula = Number(cedula);
+    }
     if (desde || hasta) {
       const gte = desde ? new Date(desde) : undefined;
 
@@ -197,6 +203,11 @@ export class NovedadController {
       id_usuario,
       filtros,
     );
+  }
+
+  @Get('masiva/cedulas-sugeridas')
+  async obtenerCedulasSugeridas(@Query('q') q?: string) {
+    return this.novedadService.buscarCedulas(q);
   }
 
   @Get('novedades-pendientes')

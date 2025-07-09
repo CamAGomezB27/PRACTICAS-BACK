@@ -9,6 +9,7 @@ interface FiltrosTienda {
     gte?: Date;
     lte?: Date;
   };
+  cedula?: number;
 }
 
 interface FiltrosParaNomina {
@@ -301,6 +302,10 @@ export class NovedadeService {
       };
     }
 
+    if (filtros.cedula) {
+      whereCondition.cedula = filtros.cedula;
+    }
+
     if (filtros.fecha) {
       const fechaFiltro: { gte?: Date; lte?: Date } = {};
 
@@ -522,6 +527,21 @@ export class NovedadeService {
       categoria_inconsistencia: detalle?.categoria_inconsistencia ?? '',
       responsable_validacion: detalle?.responsable_validacion ?? '',
     };
+  }
+
+  async buscarCedulas(q?: string) {
+    if (!q || isNaN(Number(q))) return [];
+
+    const cedulas = await this.prisma.$queryRaw<
+      { cedula: number; nombre: string }[]
+    >(Prisma.sql`
+    SELECT DISTINCT cedula, nombre
+    FROM "detalle_novedad_masiva"
+    WHERE CAST(cedula AS TEXT) LIKE ${q + '%'}
+    LIMIT 10
+  `);
+
+    return cedulas;
   }
 
   async obtenerNovedadesPendientesParaNomina(filtros: FiltrosParaNomina = {}) {
