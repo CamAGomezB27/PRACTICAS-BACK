@@ -19,7 +19,7 @@ interface FiltrosParaNomina {
     gte?: Date;
     lte?: Date;
   };
-  estado?: string;
+  cedula?: number;
 }
 
 interface CrearNovedadIndividual {
@@ -715,6 +715,10 @@ export class NovedadeService {
       }
     }
 
+    if (filtros.cedula) {
+      whereCondition.cedula = filtros.cedula;
+    }
+
     return this.prisma.detalleNovedadMasiva.findMany({
       where: whereCondition,
       orderBy: { id_novedad: 'asc' },
@@ -862,6 +866,10 @@ export class NovedadeService {
         equals: filtros.tipo,
         mode: 'insensitive',
       };
+    }
+
+    if (filtros.cedula) {
+      whereCondition.cedula = filtros.cedula;
     }
 
     if (filtros.fecha) {

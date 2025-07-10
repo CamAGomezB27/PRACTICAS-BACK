@@ -314,16 +314,47 @@ export class NovedadController {
     @Query('tipo') tipo: string,
     @Query('desde') desde: string,
     @Query('hasta') hasta: string,
+    @Query('cedula') cedula: string,
   ) {
     const filtros: FiltrosParaNomina = {};
 
     if (tienda) filtros.tienda = tienda;
     if (tipo) filtros.tipo = tipo;
+    if (cedula && !isNaN(Number(cedula))) {
+      filtros.cedula = Number(cedula);
+    }
 
     if (desde || hasta) {
-      filtros.fecha = {};
-      if (desde) filtros.fecha.gte = new Date(desde);
-      if (hasta) filtros.fecha.lte = new Date(hasta);
+      const gte = desde ? new Date(desde) : undefined;
+
+      function obtenerFinDelDiaEnUTC(fecha: string): Date {
+        const soloFecha = fecha.split('T')[0]; // ← corta antes de la "T"
+        const partes = soloFecha.split('-');
+
+        if (partes.length !== 3)
+          throw new Error(`Formato de fecha inválido: ${fecha}`);
+
+        const [año, mes, dia] = partes.map(Number);
+        const fechaLocal = new Date(año, mes - 1, dia, 23, 59, 59, 999);
+
+        if (isNaN(fechaLocal.getTime())) {
+          throw new Error(`Fecha inválida construida: ${fecha}`);
+        }
+
+        return fechaLocal;
+      }
+
+      const lte = hasta ? obtenerFinDelDiaEnUTC(hasta) : undefined;
+
+      // Validar que al menos una fecha sea válida
+      const isValidGte = gte && !isNaN(gte.getTime());
+      const isValidLte = lte && !isNaN(lte.getTime());
+
+      if (isValidGte || isValidLte) {
+        filtros.fecha = {};
+        if (isValidGte) filtros.fecha.gte = gte!;
+        if (isValidLte) filtros.fecha.lte = lte!;
+      }
     }
 
     return this.novedadService.obtenerDetallesParaConsolidado(filtros);
@@ -335,16 +366,47 @@ export class NovedadController {
     @Query('tipo') tipo: string,
     @Query('desde') desde: string,
     @Query('hasta') hasta: string,
+    @Query('cedula') cedula: string,
   ) {
     const filtros: FiltrosParaNomina = {};
 
     if (tienda) filtros.tienda = tienda;
     if (tipo) filtros.tipo = tipo;
+    if (cedula && !isNaN(Number(cedula))) {
+      filtros.cedula = Number(cedula);
+    }
 
     if (desde || hasta) {
-      filtros.fecha = {};
-      if (desde) filtros.fecha.gte = new Date(desde);
-      if (hasta) filtros.fecha.lte = new Date(hasta);
+      const gte = desde ? new Date(desde) : undefined;
+
+      function obtenerFinDelDiaEnUTC(fecha: string): Date {
+        const soloFecha = fecha.split('T')[0]; // ← corta antes de la "T"
+        const partes = soloFecha.split('-');
+
+        if (partes.length !== 3)
+          throw new Error(`Formato de fecha inválido: ${fecha}`);
+
+        const [año, mes, dia] = partes.map(Number);
+        const fechaLocal = new Date(año, mes - 1, dia, 23, 59, 59, 999);
+
+        if (isNaN(fechaLocal.getTime())) {
+          throw new Error(`Fecha inválida construida: ${fecha}`);
+        }
+
+        return fechaLocal;
+      }
+
+      const lte = hasta ? obtenerFinDelDiaEnUTC(hasta) : undefined;
+
+      // Validar que al menos una fecha sea válida
+      const isValidGte = gte && !isNaN(gte.getTime());
+      const isValidLte = lte && !isNaN(lte.getTime());
+
+      if (isValidGte || isValidLte) {
+        filtros.fecha = {};
+        if (isValidGte) filtros.fecha.gte = gte!;
+        if (isValidLte) filtros.fecha.lte = lte!;
+      }
     }
 
     return this.novedadService.obtenerDetallesPendientesParaNomina(filtros);
